@@ -1087,6 +1087,7 @@ def _run_kt_java_builder_actions(
             if JavacOptions in plugin
             for flag in javac_options_to_flags(plugin[JavacOptions])
         ])
+        javac_opts.extend(ctx.attr.experimental_javac_opts_extras)
 
         # Compile the Java half with the same warning mode as the kotlin part, unless the javac
         # options (or a plugin's) already set one: a single `warn` value governs the whole target.
