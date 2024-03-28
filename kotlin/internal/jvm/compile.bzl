@@ -985,6 +985,7 @@ def _run_kt_java_builder_actions(
             if JavacOptions in plugin
             for flag in javac_options_to_flags(plugin[JavacOptions])
         ])
+        javac_opts.extend(ctx.attr.experimental_javac_opts_extras)
 
         java_sources = list(srcs.java)
         java_srcjars = generated_kapt_src_jars + srcs.src_jars + generated_ksp_src_jars
