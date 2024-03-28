@@ -240,6 +240,11 @@ _common_attr = utils.add_dicts(
             providers = [_JavacOptions],
             mandatory = False,
         ),
+        "experimental_javac_opts_extras": attr.string_list(
+            doc = """Additional Javac options to be used for custom, package-specific options.""",
+            default = [],
+            mandatory = False,
+        ),
         "kotlinc_opts": attr.label(
             doc = """Kotlinc options to be used when compiling this target. These opts if provided
             will be used instead of the ones provided to the toolchain.""",
