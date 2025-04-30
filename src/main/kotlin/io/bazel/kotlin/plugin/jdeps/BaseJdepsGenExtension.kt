@@ -123,14 +123,6 @@ abstract class BaseJdepsGenExtension(
     rootBuilder.success = true
     rootBuilder.ruleLabel = targetLabel
 
-    val unusedDeps = directDeps.subtract(explicitDeps.keys)
-    unusedDeps.forEach { jarPath ->
-      val dependency = Deps.Dependency.newBuilder()
-      dependency.kind = Deps.Dependency.Kind.UNUSED
-      dependency.path = jarPath
-      rootBuilder.addDependency(dependency)
-    }
-
     explicitDeps.toSortedMap().forEach { (jarPath, usedClasses) ->
       val dependency = Deps.Dependency.newBuilder()
       dependency.kind = Deps.Dependency.Kind.EXPLICIT
