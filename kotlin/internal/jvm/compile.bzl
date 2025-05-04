@@ -942,8 +942,9 @@ def _run_kt_java_builder_actions(
             if not use_javac_annotation_processor:
                 javac_opts.append("-proc:none")
             else:
-                javac_opts.append('-Xplugin:"Kaptish %s"' % kt_runtime_jar.path)
-                annotation_processor_additional_inputs = [kt_runtime_jar]
+                kaptish_jar = kt_compile_jar if toolchains.kt.experimental_kaptish_use_abi_jars else kt_runtime_jar
+                javac_opts.append('-Xplugin:"Kaptish %s"' % kaptish_jar.path)
+                annotation_processor_additional_inputs = [kaptish_jar]
 
         java_info = java_common.compile(
             ctx,
