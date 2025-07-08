@@ -20,6 +20,7 @@ private const val ANONYMOUS = "<anonymous>"
 class ClassUsageRecorder(
   internal val explicitClassesCanonicalPaths: MutableSet<String> = mutableSetOf(),
   internal val implicitClassesCanonicalPaths: MutableSet<String> = mutableSetOf(),
+  internal val usedResources: MutableSet<String> = mutableSetOf(),
   private val seen: MutableSet<ClassId> = mutableSetOf(),
   private val results: MutableMap<String, SortedSet<String>> = sortedMapOf(),
   private val rootPath: String = Paths.get("").toAbsolutePath().toString() + "/",
@@ -97,6 +98,10 @@ class ClassUsageRecorder(
     isExplicit: Boolean = true,
   ) {
     addFile(binaryClass, isExplicit)
+  }
+
+  internal fun recordResource(resourceId: String) {
+    usedResources.add(resourceId)
   }
 
   private fun addFile(

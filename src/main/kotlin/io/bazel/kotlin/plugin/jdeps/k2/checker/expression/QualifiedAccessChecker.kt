@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.expression.FirQualifiedAccessExpressionChecker
 import org.jetbrains.kotlin.fir.declarations.FirConstructor
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
+import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.arguments
 import org.jetbrains.kotlin.fir.expressions.toResolvedCallableSymbol
@@ -15,6 +16,7 @@ import org.jetbrains.kotlin.fir.references.toResolvedFunctionSymbol
 import org.jetbrains.kotlin.fir.types.isExtensionFunctionType
 import org.jetbrains.kotlin.fir.types.isUnit
 import org.jetbrains.kotlin.fir.types.resolvedType
+import org.jetbrains.kotlin.KtSourceElement
 
 internal class QualifiedAccessChecker(
   private val classUsageRecorder: ClassUsageRecorder,
@@ -66,5 +68,19 @@ internal class QualifiedAccessChecker(
         classUsageRecorder.recordConeType(it, context, isExplicit = false)
       }
     }
+
+    // track android resources
+    getResourceName(expression)?.let {
+      classUsageRecorder.recordResource(it)
+    }
+  }
+
+  // TODO: more robust way to extract resourceName
+  private fun getResourceName(expression: FirQualifiedAccessExpression): String? {
+    return (expression as? FirPropertyAccessExpression)
+      ?.source
+      ?.getElementTextInContextForDebug()
+      ?.replace(Regex("\\s+"), "")
+      ?.takeIf { (".R." in it || it.startsWith("R.")) && '{' !in it && '(' !in it && ':' !in it}
   }
 }
