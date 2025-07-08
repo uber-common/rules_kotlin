@@ -377,7 +377,7 @@ class JdepsGenExtension(
     bindingTrace: BindingTrace,
     files: Collection<KtFile>,
   ): AnalysisResult? {
-    onAnalysisCompleted(explicitClassesCanonicalPaths, implicitClassesCanonicalPaths)
+    onAnalysisCompleted(explicitClassesCanonicalPaths, implicitClassesCanonicalPaths, usedResources)
 
     return super.analysisCompleted(project, module, bindingTrace, files)
   }
@@ -452,19 +452,6 @@ class JdepsGenExtension(
     BufferedOutputStream(File(jdepsOutput).outputStream()).use {
       it.write(rootBuilder.build().toByteArray())
     }
-  }
-
-  /**
-   * Compute hash of internal jar class ABI definition.
-   */
-  private fun getHashFromJarEntry(
-    jarPath: String,
-    internalPath: String,
-  ): ByteArray {
-    val jarFile = JarFile(jarPath)
-    val entry = jarFile.getEntry(internalPath)
-    val bytes = ByteStreams.toByteArray(jarFile.getInputStream(entry))
-    return MessageDigest.getInstance("SHA-256").digest(bytes)
   }
 
   private fun doStrictDeps(
