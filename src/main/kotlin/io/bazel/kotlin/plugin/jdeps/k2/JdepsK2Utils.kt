@@ -1,6 +1,8 @@
 package io.bazel.kotlin.plugin.jdeps.k2
 
 import org.jetbrains.kotlin.descriptors.SourceElement
+import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression
+import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.java.JavaBinarySourceElement
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.load.kotlin.KotlinJvmBinarySourceElement
