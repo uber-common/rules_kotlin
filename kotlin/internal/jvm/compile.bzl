@@ -482,6 +482,10 @@ def _run_ksp_builder_actions(
     """
     ksp_generated_java_srcjar = ctx.actions.declare_file(ctx.label.name + "-ksp-kt-gensrc.jar")
 
+    ksp_jdeps = None
+    if toolchains.kt.jvm_emit_jdeps and toolchains.kt.experimental_emit_jdeps_for_ksp:
+        ksp_jdeps = ctx.actions.declare_file(ctx.label.name + "-ksp.jdeps")
+
     _run_kt_builder_action(
         ctx = ctx,
         rule_kind = rule_kind,
@@ -496,6 +500,7 @@ def _run_ksp_builder_actions(
         plugins = plugins,
         outputs = {
             "ksp_generated_java_srcjar": ksp_generated_java_srcjar,
+            "kotlin_output_jdeps": ksp_jdeps,
         },
         build_kotlin = False,
         mnemonic = "KotlinKsp",
