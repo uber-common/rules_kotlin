@@ -188,6 +188,18 @@ internal fun JvmCompilationTask.kaptArgs(
 
 internal fun JvmCompilationTask.kspArgs(plugins: InternalCompilerPlugins): CompilationArgs =
   CompilationArgs().apply {
+    given(outputs.jdeps).notEmpty {
+      plugin(plugins.jdeps) {
+        flag("output", outputs.jdeps)
+        flag("target_label", info.label)
+        inputs.directDependenciesList.forEach {
+          flag("direct_dependencies", it)
+        }
+        flag("strict_kotlin_deps", info.strictKotlinDeps)
+        flag("track_class_usage", info.trackClassUsage)
+        flag("track_resource_usage", info.trackResourceUsage)
+      }
+    }
     plugin(plugins.kspSymbolProcessingCommandLine)
     plugin(plugins.kspSymbolProcessingApi) {
       flag("-Xallow-no-source-files")
