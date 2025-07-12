@@ -81,6 +81,6 @@ internal class QualifiedAccessChecker(
       ?.source
       ?.getElementTextInContextForDebug()
       ?.replace(Regex("\\s+"), "")
-      ?.takeIf { (".R." in it || it.startsWith("R.")) && '{' !in it && '(' !in it }
+      ?.takeIf { (".R." in it || it.startsWith("R.")) && '{' !in it && '(' !in it && ':' !in it}
   }
 }
