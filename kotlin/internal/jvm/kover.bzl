@@ -78,8 +78,11 @@ def get_kover_jvm_flags(kover_agent_files, kover_args_file):
     returns:
         the flag string to be used by test runner jvm
     """
-
-    return "-javaagent:%s=file:%s" % (kover_agent_files[0].short_path, kover_args_file.short_path)
+    jvm_args = [
+        "-Xbootclasspath/a:%s" % (kover_agent_files[0].short_path),
+        "-javaagent:%s=file:%s" % (kover_agent_files[0].short_path, kover_args_file.short_path)
+    ]
+    return " ".join(jvm_args)
 
 def create_kover_agent_actions(ctx, name):
     """ Generate the actions needed to emit Kover code coverage metadata file. It creates
