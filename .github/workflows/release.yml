@@ -5,7 +5,7 @@ name: Release Binary Package
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "v*"
 
 jobs:
   build:
