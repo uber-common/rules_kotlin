@@ -22,26 +22,25 @@ import org.jetbrains.kotlin.name.ClassId
 internal class FileChecker(
   private val classUsageRecorder: ClassUsageRecorder,
 ) : FirFileChecker(MppCheckerKind.Common) {
+  context(CheckerContext, DiagnosticReporter)
   override fun check(
     declaration: FirFile,
-    context: CheckerContext,
-    reporter: DiagnosticReporter,
   ) {
     declaration.imports.filterIsInstance<FirResolvedImport>().forEach { import ->
       // check for classlike import (class, interface, object, enum, annotation, etc)
-      if (import.resolvesToClass(context)) {
-        import.classId()?.resolveToClass(context)?.let {
-          classUsageRecorder.recordClass(it, context)
+      if (import.resolvesToClass(this@CheckerContext)) {
+        import.classId()?.resolveToClass(this@CheckerContext)?.let {
+          classUsageRecorder.recordClass(it, this@CheckerContext)
         }
       } else {
         // check for function import
-        val callableBinaryClass = import.resolveToFun(context)?.containerSource?.binaryClass()
+        val callableBinaryClass = import.resolveToFun(this@CheckerContext)?.containerSource?.binaryClass()
         if (callableBinaryClass != null) {
           classUsageRecorder.recordClass(callableBinaryClass)
         } else {
           // for other symbols, track the parent class
-          import.resolvedParentClassId?.resolveToClass(context)?.let {
-            classUsageRecorder.recordClass(it, context)
+          import.resolvedParentClassId?.resolveToClass(this@CheckerContext)?.let {
+            classUsageRecorder.recordClass(it, this@CheckerContext)
           }
         }
       }

@@ -37,6 +37,9 @@ def kt_bootstrap_library(name, deps = [], neverlink_deps = [], srcs = [], visibi
         **kwargs
     )
 
+    # Filter out kotlinc_opts from kwargs for ktlint rules (they don't support it)
+    ktlint_kwargs = {k: v for k, v in kwargs.items() if k != "kotlinc_opts"}
+
     _ktlint_test(
         name = "%s_ktlint_test" % name,
         srcs = srcs,
@@ -51,7 +54,7 @@ def kt_bootstrap_library(name, deps = [], neverlink_deps = [], srcs = [], visibi
         visibility = ["//visibility:private"],
         config = "//:ktlint_editorconfig",
         tags = ["no-ide", "ktlint"],
-        **kwargs
+        **ktlint_kwargs
     )
 
 def kt_bootstrap_binary(

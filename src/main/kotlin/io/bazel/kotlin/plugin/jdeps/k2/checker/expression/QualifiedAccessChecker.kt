@@ -21,10 +21,9 @@ import org.jetbrains.kotlin.KtSourceElement
 internal class QualifiedAccessChecker(
   private val classUsageRecorder: ClassUsageRecorder,
 ) : FirQualifiedAccessExpressionChecker(MppCheckerKind.Common) {
+  context(CheckerContext, DiagnosticReporter)
   override fun check(
     expression: FirQualifiedAccessExpression,
-    context: CheckerContext,
-    reporter: DiagnosticReporter,
   ) {
     // track function's owning class
     val resolvedCallableSymbol = expression.toResolvedCallableSymbol()
@@ -37,7 +36,7 @@ internal class QualifiedAccessChecker(
     resolvedCallableSymbol?.resolvedReturnTypeRef?.let {
       classUsageRecorder.recordTypeRef(
         it,
-        context,
+        this@CheckerContext,
         isExplicit = isExplicitReturnType,
         collectTypeArguments = false,
       )
@@ -45,7 +44,7 @@ internal class QualifiedAccessChecker(
 
     // type arguments
     resolvedCallableSymbol?.typeParameterSymbols?.forEach { typeParam ->
-      typeParam.resolvedBounds.forEach { classUsageRecorder.recordTypeRef(it, context) }
+      typeParam.resolvedBounds.forEach { classUsageRecorder.recordTypeRef(it, this@CheckerContext) }
     }
 
     // track fun parameter types based on referenced function
@@ -54,18 +53,18 @@ internal class QualifiedAccessChecker(
       ?.valueParameterSymbols
       ?.forEach { valueParam ->
         valueParam.resolvedReturnTypeRef.let {
-          classUsageRecorder.recordTypeRef(it, context, isExplicit = false)
+          classUsageRecorder.recordTypeRef(it, this@CheckerContext, isExplicit = false)
         }
       }
     // track fun arguments actually passed
     (expression as? FirFunctionCall)?.arguments?.map { it.resolvedType }?.forEach {
-      classUsageRecorder.recordConeType(it, context, isExplicit = !it.isExtensionFunctionType)
+      classUsageRecorder.recordConeType(it, this@CheckerContext, isExplicit = !it.isExtensionFunctionType)
     }
 
     // track dispatch receiver
     expression.dispatchReceiver?.resolvedType?.let {
       if (!it.isUnit) {
-        classUsageRecorder.recordConeType(it, context, isExplicit = false)
+        classUsageRecorder.recordConeType(it, this@CheckerContext, isExplicit = false)
       }
     }
 

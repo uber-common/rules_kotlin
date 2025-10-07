@@ -11,14 +11,13 @@ import org.jetbrains.kotlin.fir.declarations.toAnnotationClassLikeSymbol
 internal class BasicDeclarationChecker(
   private val classUsageRecorder: ClassUsageRecorder,
 ) : FirBasicDeclarationChecker(MppCheckerKind.Common) {
+  context(CheckerContext, DiagnosticReporter)
   override fun check(
     declaration: FirDeclaration,
-    context: CheckerContext,
-    reporter: DiagnosticReporter,
   ) {
     declaration.annotations.forEach { annotation ->
-      annotation.toAnnotationClassLikeSymbol(context.session)?.let {
-        classUsageRecorder.recordClass(it, context)
+      annotation.toAnnotationClassLikeSymbol(this@CheckerContext.session)?.let {
+        classUsageRecorder.recordClass(it, this@CheckerContext)
       }
     }
   }

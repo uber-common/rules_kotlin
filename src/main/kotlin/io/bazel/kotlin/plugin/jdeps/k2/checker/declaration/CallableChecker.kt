@@ -16,25 +16,24 @@ internal class CallableChecker(
    * Tracks the return type & type parameters of a callable declaration. Function parameters are
    * tracked in [FunctionChecker].
    */
+  context(CheckerContext, DiagnosticReporter)
   override fun check(
     declaration: FirCallableDeclaration,
-    context: CheckerContext,
-    reporter: DiagnosticReporter,
   ) {
     // return type
-    declaration.returnTypeRef.let { classUsageRecorder.recordTypeRef(it, context) }
+    declaration.returnTypeRef.let { classUsageRecorder.recordTypeRef(it, this@CheckerContext) }
 
     // type params
     declaration.typeParameters.forEach { typeParam ->
       typeParam.symbol.resolvedBounds.forEach { typeParamBound ->
-        typeParamBound.let { classUsageRecorder.recordTypeRef(it, context) }
+        typeParamBound.let { classUsageRecorder.recordTypeRef(it, this@CheckerContext) }
       }
     }
 
     // receiver param for extensions
     if (declaration !is FirAnonymousFunction) {
       declaration.receiverParameter?.typeRef?.let {
-        classUsageRecorder.recordTypeRef(it, context, isExplicit = declaration.isExtension)
+        classUsageRecorder.recordTypeRef(it, this@CheckerContext, isExplicit = declaration.isExtension)
       }
     }
   }

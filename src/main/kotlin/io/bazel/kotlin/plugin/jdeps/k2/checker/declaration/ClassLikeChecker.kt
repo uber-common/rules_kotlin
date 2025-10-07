@@ -11,15 +11,14 @@ import org.jetbrains.kotlin.fir.resolve.getSuperTypes
 internal class ClassLikeChecker(
   private val classUsageRecorder: ClassUsageRecorder,
 ) : FirClassLikeChecker(MppCheckerKind.Common) {
+  context(CheckerContext, DiagnosticReporter)
   override fun check(
     declaration: FirClassLikeDeclaration,
-    context: CheckerContext,
-    reporter: DiagnosticReporter,
   ) {
-    declaration.symbol.let { classUsageRecorder.recordClass(it, context) }
+    declaration.symbol.let { classUsageRecorder.recordClass(it, this@CheckerContext) }
     // [recordClass] also handles supertypes, but this marks direct supertypes as explicit
-    declaration.symbol.getSuperTypes(context.session, recursive = false).forEach {
-      classUsageRecorder.recordConeType(it, context)
+    declaration.symbol.getSuperTypes(this@CheckerContext.session, recursive = false).forEach {
+      classUsageRecorder.recordConeType(it, this@CheckerContext)
     }
   }
 }

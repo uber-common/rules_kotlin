@@ -11,13 +11,12 @@ import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
 internal class ResolvedQualifierChecker(
   private val classUsageRecorder: ClassUsageRecorder,
 ) : FirResolvedQualifierChecker(MppCheckerKind.Common) {
+  context(CheckerContext, DiagnosticReporter)
   override fun check(
     expression: FirResolvedQualifier,
-    context: CheckerContext,
-    reporter: DiagnosticReporter,
   ) {
     expression.symbol?.let {
-      classUsageRecorder.recordClass(it, context)
+      classUsageRecorder.recordClass(it, this@CheckerContext)
     }
   }
 }
