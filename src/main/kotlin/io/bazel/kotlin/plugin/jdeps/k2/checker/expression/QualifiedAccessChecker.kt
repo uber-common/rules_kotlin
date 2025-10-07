@@ -21,10 +21,9 @@ import org.jetbrains.kotlin.KtSourceElement
 internal class QualifiedAccessChecker(
   private val classUsageRecorder: ClassUsageRecorder,
 ) : FirQualifiedAccessExpressionChecker(MppCheckerKind.Common) {
+  context(context: CheckerContext, reporter: DiagnosticReporter)
   override fun check(
     expression: FirQualifiedAccessExpression,
-    context: CheckerContext,
-    reporter: DiagnosticReporter,
   ) {
     // track function's owning class
     val resolvedCallableSymbol = expression.toResolvedCallableSymbol()

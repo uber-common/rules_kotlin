@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bazelisk build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
