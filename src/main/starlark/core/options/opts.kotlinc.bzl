@@ -60,6 +60,20 @@ _KOPTS_ALL = {
             "none": ["-no-stdlib"],
         },
     ),
+    "x_annotation_default_target": struct(
+        flag = "-Xannotation-default-target",
+        args = dict(
+            default = "first-only-warn",
+            doc = "Change the default annotation targets for constructor properties.",
+            values = ["first-only" "first-only-warn", "param-property"],
+        ),
+        type = attr.string,
+        value_to_flag = {
+            "first-only": ["-Xannotation-default-target=first-only"],
+            "first-only-warn": ["-Xannotation-default-target=first-only-warn"],
+            "param-property": ["-Xannotation-default-target=param-property"],
+        },
+    ),
     "x_skip_prerelease_check": struct(
         flag = "-Xskip-prerelease-check",
         args = dict(
@@ -80,6 +94,17 @@ _KOPTS_ALL = {
         type = attr.bool,
         value_to_flag = {
             True: ["-Xcontext-receivers"],
+        },
+    ),
+    "x_context_parameters": struct(
+        flag = "-Xcontext-parameters",
+        args = dict(
+            default = False,
+            doc = "Enable experimental context parameters (supersedes context receivers).",
+        ),
+        type = attr.bool,
+        value_to_flag = {
+            True: ["-Xcontext-parameters"],
         },
     ),
     "x_suppress_version_warnings": struct(

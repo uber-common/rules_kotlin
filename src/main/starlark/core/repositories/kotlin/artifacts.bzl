@@ -65,7 +65,6 @@ KOTLINC_ARTIFACTS = struct(
             "kotlinx-coroutines-core-jvm": "lib/kotlinx-coroutines-core-jvm.jar",
             "parcelize-compiler": "lib/parcelize-compiler.jar",
             "scripting-compiler": "lib/scripting-compiler.jar",
-            "trove4j": "lib/trove4j.jar",
         },
     ),
 )
