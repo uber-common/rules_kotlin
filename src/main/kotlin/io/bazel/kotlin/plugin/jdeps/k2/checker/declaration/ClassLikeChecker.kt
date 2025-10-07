@@ -11,10 +11,9 @@ import org.jetbrains.kotlin.fir.resolve.getSuperTypes
 internal class ClassLikeChecker(
   private val classUsageRecorder: ClassUsageRecorder,
 ) : FirClassLikeChecker(MppCheckerKind.Common) {
+  context(context: CheckerContext, reporter: DiagnosticReporter)
   override fun check(
     declaration: FirClassLikeDeclaration,
-    context: CheckerContext,
-    reporter: DiagnosticReporter,
   ) {
     declaration.symbol.let { classUsageRecorder.recordClass(it, context) }
     // [recordClass] also handles supertypes, but this marks direct supertypes as explicit
