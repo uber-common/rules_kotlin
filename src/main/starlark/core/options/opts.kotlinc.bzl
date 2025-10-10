@@ -65,7 +65,7 @@ _KOPTS_ALL = {
         args = dict(
             default = "first-only-warn",
             doc = "Change the default annotation targets for constructor properties.",
-            values = ["first-only" "first-only-warn", "param-property"],
+            values = ["first-only", "first-only-warn", "param-property"],
         ),
         type = attr.string,
         value_to_flag = {
