@@ -140,21 +140,18 @@ _KOPTS_ALL = {
             True: ["-Xallow-result-return-type"],
         },
     ),
-    "x_jvm_default": struct(
-        flag = "-Xjvm-default",
+    "jvm_default": struct(
+        flag = "-jvm-default",
         args = dict(
-            default = "off",
-            doc = "Specifies that a JVM default method should be generated for non-abstract Kotlin interface member.",
-            values = ["off", "enable", "disable", "compatibility", "all-compatibility", "all"],
+            default = "enable",
+            doc = "Emit JVM default methods for interface declarations with bodies. The default is 'enable'",
+            values = ["enable", "disable", "no-compatibility"],
         ),
         type = attr.string,
         value_to_flag = {
-            "off": None,
-            "enable": ["-Xjvm-default=enable"],
-            "disable": ["-Xjvm-default=disable"],
-            "compatibility": ["-Xjvm-default=compatibility"],
-            "all-compatibility": ["-Xjvm-default=all-compatibility"],
-            "all": ["-Xjvm-default=all"],
+            "enable": ["-jvm-default=enable"],
+            "disable": ["-jvm-default=disable"],
+            "no-compatibility": ["-jvm-default=no-compatibility"],
         },
     ),
     "x_no_call_assertions": struct(
