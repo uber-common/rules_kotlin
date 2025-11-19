@@ -540,6 +540,11 @@ kt_jvm_library(
 ```
 """,
     attrs = {
+        "data": attr.label_list(
+            doc = "The list of data files to be used by compiler's plugin",
+            providers = [DefaultInfo],
+            cfg = "exec",
+        ),
         "deps": attr.label_list(
             doc = "The list of libraries to be added to the compiler's plugin classpath",
             providers = [JavaInfo],
@@ -650,6 +655,11 @@ kt_plugin_cfg = rule(
     This allows setting options and dependencies independently from the initial plugin definition.
     """,
     attrs = {
+        "data": attr.label_list(
+            doc = "The list of data files to be used by compiler's plugin",
+            providers = [DefaultInfo],
+            cfg = "exec",
+        ),
         "plugin": attr.label(
             doc = "The plugin to associate with this configuration",
             providers = [_KtCompilerPluginInfo],
@@ -668,6 +678,7 @@ kt_plugin_cfg = rule(
         ),
     },
 )
+
 #
 # Exposed for kt_android_* rules.
 #

@@ -28,15 +28,16 @@ load(
     _kt_jvm_produce_jar_actions = "kt_jvm_produce_jar_actions",
 )
 load(
-    "//kotlin/internal/utils:utils.bzl",
-    _utils = "utils",
-)
-load("//kotlin/internal/jvm:kover.bzl",
-    _is_kover_enabled = "is_kover_enabled",
-    _get_kover_agent_files = "get_kover_agent_file",
+    "//kotlin/internal/jvm:kover.bzl",
     _create_kover_agent_actions = "create_kover_agent_actions",
     _create_kover_metadata_action = "create_kover_metadata_action",
+    _get_kover_agent_files = "get_kover_agent_file",
     _get_kover_jvm_flags = "get_kover_jvm_flags",
+    _is_kover_enabled = "is_kover_enabled",
+)
+load(
+    "//kotlin/internal/utils:utils.bzl",
+    _utils = "utils",
 )
 load("//third_party:jarjar.bzl", "jarjar_action")
 
@@ -291,7 +292,7 @@ def kt_jvm_junit_test_impl(ctx):
                 ctx,
                 ctx.attr.name,
                 ctx.attr.deps + ctx.attr.associates,
-                kover_output_file
+                kover_output_file,
             )
             flags = _get_kover_jvm_flags(kover_agent_files, kover_args_file)
 
@@ -323,7 +324,7 @@ def kt_jvm_junit_test_impl(ctx):
 
     runtime_jars = depset(
         ctx.files._bazel_test_runner,
-        transitive = [providers.java.transitive_runtime_jars] + coverage_inputs
+        transitive = [providers.java.transitive_runtime_jars] + coverage_inputs,
     )
 
     coverage_metadata = _write_launcher_action(
@@ -453,6 +454,9 @@ def _resolve_plugin_cfg(info, options, deps, expand_location):
         data = depset(),
     )
 
+def _expand_location_with_data_deps(ctx):
+    return lambda targets: ctx.expand_location(targets, ctx.attr.data)
+
 def kt_compiler_plugin_impl(ctx):
     plugin_id = ctx.attr.id
 
@@ -474,7 +478,7 @@ def kt_compiler_plugin_impl(ctx):
     classpath = depset(info.runtime_output_jars, transitive = [info.transitive_runtime_jars])
 
     # TODO(1035): Migrate kt_compiler_plugin.options to string_list_dict
-    options = _resolve_plugin_options(plugin_id, {k: [v] for (k, v) in ctx.attr.options.items()}, ctx.expand_location)
+    options = _resolve_plugin_options(plugin_id, {k: [v] for (k, v) in ctx.attr.options.items()}, _expand_location_with_data_deps(ctx))
 
     return [
         DefaultInfo(files = classpath),
@@ -490,7 +494,7 @@ def kt_compiler_plugin_impl(ctx):
 
 def kt_plugin_cfg_impl(ctx):
     plugin = ctx.attr.plugin[_KtCompilerPluginInfo]
-    return plugin.resolve_cfg(plugin, ctx.attr.options, ctx.attr.deps, ctx.expand_location)
+    return plugin.resolve_cfg(plugin, ctx.attr.options, ctx.attr.deps, _expand_location_with_data_deps(ctx))
 
 def kt_ksp_plugin_impl(ctx):
     deps = ctx.attr.deps
