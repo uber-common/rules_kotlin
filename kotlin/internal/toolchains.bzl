@@ -101,6 +101,11 @@ def _kotlin_toolchain_impl(ctx):
         empty_jar = ctx.file._empty_jar,
         empty_jdeps = ctx.file._empty_jdeps,
         jacocorunner = ctx.attr.jacocorunner,
+        experimental_kover_enabled = ctx.attr.experimental_kover_enabled,
+        experimental_kover_agent = ctx.attr.experimental_kover_agent,
+        experimental_kover_exclude = ctx.attr.experimental_kover_exclude,
+        experimental_kover_exclude_annotation = ctx.attr.experimental_kover_exclude_annotation,
+        experimental_kover_exclude_inherited_from = ctx.attr.experimental_kover_exclude_inherited_from,
         experimental_prune_transitive_deps = ctx.attr._experimental_prune_transitive_deps[BuildSettingInfo].value,
         experimental_strict_associate_dependencies = ctx.attr._experimental_strict_associate_dependencies[BuildSettingInfo].value,
     )
@@ -148,6 +153,23 @@ _kt_toolchain = rule(
             then injects compiled classes into javac's AP phase. 1.75-2x faster than KAPT.
             Disable per-target with tag `kaptish_disabled`.""",
             default = False,
+        ),
+        "experimental_kover_agent": attr.label(
+            doc = """Kover agent Jar target used for code coverage, only used if experimental_kover_enabled is true.""",
+            providers = [JavaInfo],
+        ),
+        "experimental_kover_enabled": attr.bool(
+            doc = """Use kover for code coverage.""",
+            default = False,
+        ),
+        "experimental_kover_exclude": attr.string_list(
+            doc = """List of exclusions to use when generating kover reports.""",
+        ),
+        "experimental_kover_exclude_annotation": attr.string_list(
+            doc = """List of annotation exclusions to use when generating kover reports.""",
+        ),
+        "experimental_kover_exclude_inherited_from": attr.string_list(
+            doc = """List of annotation exclusions from inherited classes to use when generating kover reports.""",
         ),
         "experimental_multiplex_workers": attr.bool(
             doc = """Run workers in multiplex mode.""",
@@ -396,6 +418,11 @@ def define_kt_toolchain(
         experimental_multiplex_workers = None,
         experimental_build_tools_api = None,
         experimental_kaptish_enabled = None,
+        experimental_kover_enabled = False,
+        experimental_kover_agent = None,
+        experimental_kover_exclude = [],
+        experimental_kover_exclude_annotation = [],
+        experimental_kover_exclude_inherited_from = [],
         javac_options = Label("//kotlin/internal:default_javac_options"),
         kotlinc_options = Label("//kotlin/internal:default_kotlinc_options"),
         jvm_stdlibs = None,
@@ -429,6 +456,11 @@ def define_kt_toolchain(
         experimental_track_resource_usage = experimental_track_resource_usage,
         experimental_build_tools_api = experimental_build_tools_api,
         experimental_kaptish_enabled = experimental_kaptish_enabled,
+        experimental_kover_enabled = experimental_kover_enabled,
+        experimental_kover_agent = experimental_kover_agent,
+        experimental_kover_exclude = experimental_kover_exclude,
+        experimental_kover_exclude_annotation = experimental_kover_exclude_annotation,
+        experimental_kover_exclude_inherited_from = experimental_kover_exclude_inherited_from,
         javac_options = javac_options,
         kotlinc_options = kotlinc_options,
         visibility = ["//visibility:public"],
