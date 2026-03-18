@@ -23,6 +23,7 @@ import kotlin.io.path.inputStream
 object BazelIntegrationTestRunner {
   @JvmStatic
   fun main(args: Array<String>) {
+    val isWindows = System.getProperty("os.name").lowercase().contains("windows")
     val fs = FileSystems.getDefault()
     val bazel = fs.getPath(System.getenv("BIT_BAZEL_BINARY"))
     val workspace = fs.getPath(System.getenv("BIT_WORKSPACE_DIR"))
@@ -137,15 +138,49 @@ object BazelIntegrationTestRunner {
           *commandFlags,
           "kind(\".*_test\", \"//...\")",
         ).ok { process ->
-          if (process.stdOut.isNotEmpty()) {
-            bazel.run(
-              workspace,
-              *systemFlags,
-              "test",
-              *commandFlags,
-              "--test_output=all",
-              "//...",
-            ).onFailThrow()
+          process.stdOut.toString(UTF_8)
+            .lineSequence()
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .toList()
+            .sorted()
+        }
+          .also { testTargets ->
+            if (testTargets.isNotEmpty()) {
+              val coverageTargets = testTargets.toTypedArray()
+              bazel.run(
+                workspace,
+                *systemFlags,
+                "test",
+                *commandFlags,
+                "--test_output=all",
+                "//...",
+              ).onFailThrow()
+              // TODO: Fix Kover coverage on Windows.
+              if (isWindows) {
+                println("Skipping Kover coverage on Windows integration runs.")
+              } else {
+                bazel.run(
+                  workspace,
+                  *systemFlags,
+                  "coverage",
+                  *commandFlags,
+                  *coverageTargets,
+                ).onFailThrow()
+              }
+              if (isWindows) {
+                println("Skipping lcov coverage on Windows integration runs.")
+              } else {
+                bazel.run(
+                  workspace,
+                  *systemFlags,
+                  "coverage",
+                  *commandFlags,
+                  "--combined_report=lcov",
+                  *coverageTargets,
+                ).onFailThrow()
+              }
+            }
           }
         }
       }
