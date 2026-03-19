@@ -80,6 +80,15 @@ kt_rules_test(
 )
 
 kt_rules_test(
+    name = "KotlinBuilderJvmClassTrackingTest",
+    size = "large",
+    srcs = ["jvm/KotlinBuilderJvmClassTrackingTest.kt"],
+    data = [
+        ":JdepsParserTestFixtures",
+    ],
+)
+
+kt_rules_test(
     name = "KotlinBuilderJvmStrictDepsTest",
     size = "large",
     srcs = ["jvm/KotlinBuilderJvmStrictDepsTest.kt"],
@@ -171,6 +180,7 @@ test_suite(
         ":KotlinBuilderJvmAbiTest",
         ":KotlinBuilderJvmBasicTest",
         ":KotlinBuilderJvmBtaTest",
+        ":KotlinBuilderJvmClassTrackingTest",
         ":KotlinBuilderJvmCoverageTest",
         ":KotlinBuilderJvmJdepsTest",
         ":KotlinBuilderJvmKaptTest",

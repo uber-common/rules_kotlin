@@ -660,6 +660,8 @@ def _run_kt_builder_action(
     args.add("--strict_kotlin_deps", toolchains.kt.experimental_strict_kotlin_deps)
     args.add_all("--classpath", compile_deps.compile_jars)
     args.add("--reduced_classpath_mode", toolchains.kt.experimental_reduce_classpath_mode)
+    args.add("--track_class_usage", toolchains.kt.experimental_track_class_usage)
+    args.add("--track_resource_usage", toolchains.kt.experimental_track_resource_usage)
 
     # These jvm-abi-gen plugin options all default to false, so only pass them when enabled to
     # avoid emitting args that don't change the underlying behavior. See the option defaults in:

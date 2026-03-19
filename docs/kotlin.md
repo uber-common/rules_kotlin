@@ -544,13 +544,12 @@ define_kt_toolchain(<a href="#define_kt_toolchain-name">name</a>, <a href="#defi
                     <a href="#define_kt_toolchain-experimental_preserve_declaration_order">experimental_preserve_declaration_order</a>,
                     <a href="#define_kt_toolchain-experimental_remove_data_class_copy_if_constructor_is_private">experimental_remove_data_class_copy_if_constructor_is_private</a>,
                     <a href="#define_kt_toolchain-experimental_strict_kotlin_deps">experimental_strict_kotlin_deps</a>, <a href="#define_kt_toolchain-experimental_report_unused_deps">experimental_report_unused_deps</a>,
-                    <a href="#define_kt_toolchain-experimental_reduce_classpath_mode">experimental_reduce_classpath_mode</a>, <a href="#define_kt_toolchain-experimental_multiplex_workers">experimental_multiplex_workers</a>,
+                    <a href="#define_kt_toolchain-experimental_reduce_classpath_mode">experimental_reduce_classpath_mode</a>, <a href="#define_kt_toolchain-experimental_track_class_usage">experimental_track_class_usage</a>,
+                    <a href="#define_kt_toolchain-experimental_track_resource_usage">experimental_track_resource_usage</a>, <a href="#define_kt_toolchain-experimental_multiplex_workers">experimental_multiplex_workers</a>,
                     <a href="#define_kt_toolchain-experimental_multiplex_sandboxing">experimental_multiplex_sandboxing</a>, <a href="#define_kt_toolchain-supports_path_mapping">supports_path_mapping</a>,
-                    <a href="#define_kt_toolchain-experimental_build_tools_api">experimental_build_tools_api</a>,
-                    <a href="#define_kt_toolchain-experimental_kaptish_enabled">experimental_kaptish_enabled</a>,
-                    <a href="#define_kt_toolchain-javac_options">javac_options</a>, <a href="#define_kt_toolchain-kotlinc_options">kotlinc_options</a>, <a href="#define_kt_toolchain-jvm_stdlibs">jvm_stdlibs</a>,
-                    <a href="#define_kt_toolchain-jvm_runtime">jvm_runtime</a>, <a href="#define_kt_toolchain-jacocorunner">jacocorunner</a>, <a href="#define_kt_toolchain-exec_compatible_with">exec_compatible_with</a>, <a href="#define_kt_toolchain-target_compatible_with">target_compatible_with</a>,
-                    <a href="#define_kt_toolchain-target_settings">target_settings</a>)
+                    <a href="#define_kt_toolchain-experimental_build_tools_api">experimental_build_tools_api</a>, <a href="#define_kt_toolchain-experimental_kaptish_enabled">experimental_kaptish_enabled</a>, <a href="#define_kt_toolchain-javac_options">javac_options</a>,
+                    <a href="#define_kt_toolchain-kotlinc_options">kotlinc_options</a>, <a href="#define_kt_toolchain-jvm_stdlibs">jvm_stdlibs</a>, <a href="#define_kt_toolchain-jvm_runtime">jvm_runtime</a>, <a href="#define_kt_toolchain-jacocorunner">jacocorunner</a>, <a href="#define_kt_toolchain-exec_compatible_with">exec_compatible_with</a>,
+                    <a href="#define_kt_toolchain-target_compatible_with">target_compatible_with</a>, <a href="#define_kt_toolchain-target_settings">target_settings</a>)
 </pre>
 
 Define the Kotlin toolchain.
@@ -573,6 +572,8 @@ Define the Kotlin toolchain.
 | <a id="define_kt_toolchain-experimental_strict_kotlin_deps"></a>experimental_strict_kotlin_deps |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-experimental_report_unused_deps"></a>experimental_report_unused_deps |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-experimental_reduce_classpath_mode"></a>experimental_reduce_classpath_mode |  <p align="center"> - </p>   |  `None` |
+| <a id="define_kt_toolchain-experimental_track_class_usage"></a>experimental_track_class_usage |  <p align="center"> - </p>   |  `None` |
+| <a id="define_kt_toolchain-experimental_track_resource_usage"></a>experimental_track_resource_usage |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-experimental_multiplex_workers"></a>experimental_multiplex_workers |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-experimental_multiplex_sandboxing"></a>experimental_multiplex_sandboxing |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-supports_path_mapping"></a>supports_path_mapping |  <p align="center"> - </p>   |  `None` |
@@ -652,4 +653,5 @@ versions.use_repository(<a href="#versions.use_repository-rule">rule</a>, <a hre
 | <a id="versions.use_repository-name"></a>name |  <p align="center"> - </p>   |  none |
 | <a id="versions.use_repository-version"></a>version |  <p align="center"> - </p>   |  none |
 | <a id="versions.use_repository-kwargs"></a>kwargs |  <p align="center"> - </p>   |  none |
+
 

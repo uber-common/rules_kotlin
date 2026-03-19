@@ -94,6 +94,10 @@ message CompilationTaskInfo {
     bool preserve_declaration_order = 16;
     // Remove the copy function when data classes have private constructors from the ABI
     bool remove_data_class_copy_if_constructor_is_private = 17;
+    // Whether to track used classes in .jdeps (for per-class compilation avoidance)
+    string track_class_usage = 18;
+    // Whether to track used android resources in .jdeps
+    string track_resource_usage = 19;
 }
 
 // Nested messages not marked with stable could be refactored.
