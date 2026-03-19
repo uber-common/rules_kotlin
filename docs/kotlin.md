@@ -529,6 +529,7 @@ define_kt_toolchain(<a href="#define_kt_toolchain-name">name</a>, <a href="#defi
                     <a href="#define_kt_toolchain-experimental_remove_private_classes_in_abi_jars">experimental_remove_private_classes_in_abi_jars</a>,
                     <a href="#define_kt_toolchain-experimental_remove_debug_info_in_abi_jars">experimental_remove_debug_info_in_abi_jars</a>, <a href="#define_kt_toolchain-experimental_strict_kotlin_deps">experimental_strict_kotlin_deps</a>,
                     <a href="#define_kt_toolchain-experimental_report_unused_deps">experimental_report_unused_deps</a>, <a href="#define_kt_toolchain-experimental_reduce_classpath_mode">experimental_reduce_classpath_mode</a>,
+                    <a href="#define_kt_toolchain-experimental_track_class_usage">experimental_track_class_usage</a>, <a href="#define_kt_toolchain-experimental_track_resource_usage">experimental_track_resource_usage</a>,
                     <a href="#define_kt_toolchain-experimental_multiplex_workers">experimental_multiplex_workers</a>, <a href="#define_kt_toolchain-experimental_multiplex_sandboxing">experimental_multiplex_sandboxing</a>,
                     <a href="#define_kt_toolchain-supports_path_mapping">supports_path_mapping</a>, <a href="#define_kt_toolchain-experimental_build_tools_api">experimental_build_tools_api</a>,
                     <a href="#define_kt_toolchain-experimental_kaptish_enabled">experimental_kaptish_enabled</a>, <a href="#define_kt_toolchain-javac_options">javac_options</a>,
@@ -554,6 +555,8 @@ Define the Kotlin toolchain.
 | <a id="define_kt_toolchain-experimental_strict_kotlin_deps"></a>experimental_strict_kotlin_deps |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-experimental_report_unused_deps"></a>experimental_report_unused_deps |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-experimental_reduce_classpath_mode"></a>experimental_reduce_classpath_mode |  <p align="center"> - </p>   |  `None` |
+| <a id="define_kt_toolchain-experimental_track_class_usage"></a>experimental_track_class_usage |  <p align="center"> - </p>   |  `None` |
+| <a id="define_kt_toolchain-experimental_track_resource_usage"></a>experimental_track_resource_usage |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-experimental_multiplex_workers"></a>experimental_multiplex_workers |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-experimental_multiplex_sandboxing"></a>experimental_multiplex_sandboxing |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-supports_path_mapping"></a>supports_path_mapping |  <p align="center"> - </p>   |  `None` |
