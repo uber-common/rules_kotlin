@@ -739,6 +739,7 @@ def _kt_jvm_produce_output_jar_actions(
     annotation_processors = _plugin_mappers.targets_to_annotation_processors(ctx.attr.plugins + ctx.attr.deps)
     ksp_annotation_processors = _plugin_mappers.targets_to_ksp_annotation_processors(ctx.attr.plugins + ctx.attr.deps)
     transitive_runtime_jars = _plugin_mappers.targets_to_transitive_runtime_jars(ctx.attr.plugins + ctx.attr.deps)
+    ksp_transitive_runtime_jars = _plugin_mappers.targets_to_ksp_transitive_runtime_jars(ctx.attr.plugins + ctx.attr.deps)
     plugins = _new_plugins_from(ctx.attr.plugins + _exported_plugins(deps = ctx.attr.deps))
 
     deps_artifacts = _deps_artifacts(toolchains, ctx.attr.deps + ctx.attr.associates)
@@ -762,6 +763,7 @@ def _kt_jvm_produce_output_jar_actions(
         annotation_processors = annotation_processors,
         ksp_annotation_processors = ksp_annotation_processors,
         transitive_runtime_jars = transitive_runtime_jars,
+        ksp_transitive_runtime_jars = ksp_transitive_runtime_jars,
         plugins = plugins,
         compile_jar = compile_jar,
         output_jdeps = output_jdeps,
@@ -866,6 +868,7 @@ def _run_kt_java_builder_actions(
         annotation_processors,
         ksp_annotation_processors,
         transitive_runtime_jars,
+        ksp_transitive_runtime_jars,
         plugins,
         compile_jar,
         output_jdeps):
@@ -914,7 +917,7 @@ def _run_kt_java_builder_actions(
             toolchains = toolchains,
             srcs = srcs,
             compile_deps = compile_deps,
-            transitive_runtime_jars = transitive_runtime_jars,
+            transitive_runtime_jars = ksp_transitive_runtime_jars,
         )
         ksp_generated_class_jar = ksp_outputs.ksp_generated_class_jar
         output_jars.append(ksp_generated_class_jar)
