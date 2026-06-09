@@ -110,6 +110,7 @@ def _kotlin_toolchain_impl(ctx):
         experimental_kover_exclude_inherited_from = ctx.attr.experimental_kover_exclude_inherited_from,
         experimental_prune_transitive_deps = ctx.attr._experimental_prune_transitive_deps[BuildSettingInfo].value,
         experimental_strict_associate_dependencies = ctx.attr._experimental_strict_associate_dependencies[BuildSettingInfo].value,
+        experimental_ksp2_psi_resolution = ctx.attr._experimental_ksp2_psi_resolution[BuildSettingInfo].value,
     )
 
     return [
@@ -371,6 +372,11 @@ _kt_toolchain = rule(
             allow_single_file = True,
             cfg = "target",
             default = Label("//third_party:empty.jdeps"),
+        ),
+        "_experimental_ksp2_psi_resolution": attr.label(
+            doc = """If enabled, KSP2 uses its experimental PSI-based symbol resolution strategy
+            (KSPJvmConfig.experimentalPsiResolution) instead of the default Analysis API strategy.""",
+            default = Label("//kotlin/settings:experimental_ksp2_psi_resolution"),
         ),
         "_experimental_prune_transitive_deps": attr.label(
             doc = """If enabled, compilation is performed against only direct dependencies.
