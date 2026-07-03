@@ -938,7 +938,7 @@ def _run_kt_java_builder_actions(
             toolchains = toolchains,
             srcs = srcs,
             compile_deps = compile_deps,
-            transitive_runtime_jars = transitive_runtime_jars,
+            transitive_runtime_jars = _plugin_mappers.targets_to_ksp_processor_jars(ctx.attr.plugins + ctx.attr.deps),
             ksp_options = ksp_options,
         )
         ksp_generated_class_jar = ksp_outputs.ksp_generated_class_jar
