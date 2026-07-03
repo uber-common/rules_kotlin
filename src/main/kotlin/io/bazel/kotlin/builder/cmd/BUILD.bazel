@@ -85,6 +85,17 @@ kt_bootstrap_binary(
     name = "ksp2",
     data = _KOTLIN_STDLIBS,
     final_runtime_deps = _KOTLIN_STDLIBS,
+    jvm_flags = [
+        # Keep JVM unified logging (e.g. codecache-full warnings) off stdout: the persistent
+        # worker uses stdout for the WorkResponse protobuf, so any JVM log there corrupts it
+        # ("Worker process returned an unparseable WorkResponse").
+        "-Xlog:disable",
+        "-Xlog:all=warning:stderr:uptime,level,tags",
+        # Long-lived KSP2 workers JIT a lot; the default code cache fills, disabling the
+        # compiler and emitting the warning above. Give it headroom.
+        "-XX:ReservedCodeCacheSize=512m",
+        "-XX:-MaxFDLimit",
+    ],
     main_class = "io.bazel.kotlin.builder.cmd.Ksp2",
     shade_rules = "//src/main/kotlin:shade.jarjar",
     visibility = ["//src:__subpackages__"],
