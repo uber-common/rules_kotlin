@@ -47,14 +47,14 @@ def _ksp_action_test_impl(ctx):
     """Verify KSP2 action is created with correct mnemonic."""
     env = analysistest.begin(ctx)
 
-    # Find the KotlinKsp2 action
+    # Find the KotlinKsp action
     actions = analysistest.target_actions(env)
-    ksp2_actions = [a for a in actions if a.mnemonic == "KotlinKsp2"]
+    ksp2_actions = [a for a in actions if a.mnemonic == "KotlinKsp"]
 
     asserts.true(
         env,
         len(ksp2_actions) > 0,
-        "Should have at least one KotlinKsp2 action",
+        "Should have at least one KotlinKsp action",
     )
 
     # Verify the KSP2 action outputs JAR files (not tree artifacts)
@@ -153,9 +153,9 @@ def _ksp_options_action_test_impl(ctx):
     env = analysistest.begin(ctx)
 
     actions = analysistest.target_actions(env)
-    ksp2_actions = [a for a in actions if a.mnemonic == "KotlinKsp2"]
+    ksp2_actions = [a for a in actions if a.mnemonic == "KotlinKsp"]
 
-    asserts.equals(env, 1, len(ksp2_actions), "Should have exactly one KotlinKsp2 action")
+    asserts.equals(env, 1, len(ksp2_actions), "Should have exactly one KotlinKsp action")
 
     argv = ksp2_actions[0].argv
 
@@ -164,7 +164,7 @@ def _ksp_options_action_test_impl(ctx):
         env,
         2,
         len(ksp_option_args),
-        "KotlinKsp2 action should have 2 --ksp_options values in argv, got: %s" % ksp_option_args,
+        "KotlinKsp action should have 2 --ksp_options values in argv, got: %s" % ksp_option_args,
     )
 
     ksp_flag_args = [arg for arg in argv if arg == "--ksp_options"]
@@ -172,7 +172,7 @@ def _ksp_options_action_test_impl(ctx):
         env,
         2,
         len(ksp_flag_args),
-        "KotlinKsp2 action should have 2 --ksp_options flags in argv",
+        "KotlinKsp action should have 2 --ksp_options flags in argv",
     )
 
     return analysistest.end(env)
@@ -200,7 +200,7 @@ def _find_javac_action(actions):
 def _has_ksp_srcjar_input(action):
     """Check whether any input to an action is a KSP-generated srcjar."""
     for i in action.inputs.to_list():
-        if i.path.endswith("-ksp-gensrc.jar"):
+        if i.path.endswith("-ksp-kt-gensrc.jar"):
             return True
     return False
 
@@ -261,9 +261,9 @@ def _ksp_processor_classpath_isolation_test_impl(ctx):
     env = analysistest.begin(ctx)
 
     actions = analysistest.target_actions(env)
-    ksp2_actions = [a for a in actions if a.mnemonic == "KotlinKsp2"]
+    ksp2_actions = [a for a in actions if a.mnemonic == "KotlinKsp"]
 
-    asserts.equals(env, 1, len(ksp2_actions), "Should have exactly one KotlinKsp2 action")
+    asserts.equals(env, 1, len(ksp2_actions), "Should have exactly one KotlinKsp action")
 
     argv = ksp2_actions[0].argv
 
@@ -304,12 +304,12 @@ def _ksp_opts_test_impl(ctx):
     env = analysistest.begin(ctx)
 
     actions = analysistest.target_actions(env)
-    ksp2_actions = [a for a in actions if a.mnemonic == "KotlinKsp2"]
+    ksp2_actions = [a for a in actions if a.mnemonic == "KotlinKsp"]
 
     asserts.true(
         env,
         len(ksp2_actions) > 0,
-        "Should have at least one KotlinKsp2 action",
+        "Should have at least one KotlinKsp action",
     )
 
     argv = ksp2_actions[0].argv

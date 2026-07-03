@@ -464,7 +464,7 @@ def _run_ksp_builder_actions(
     """
 
     # Output JARs - the worker creates these directly
-    ksp_generated_java_srcjar = ctx.actions.declare_file(ctx.label.name + "-ksp-gensrc.jar")
+    ksp_generated_java_srcjar = ctx.actions.declare_file(ctx.label.name + "-ksp-kt-gensrc.jar")
     ksp_generated_classes_jar = ctx.actions.declare_file(ctx.label.name + "-ksp-genclasses.jar")
 
     # Build arguments for KSP2 worker (flagfile format)
@@ -525,7 +525,7 @@ def _run_ksp_builder_actions(
     # Run KSP2 via dedicated worker (separate from kotlinc worker)
     # Single action: staging + KSP2 + packaging all happen in the worker
     ctx.actions.run(
-        mnemonic = "KotlinKsp2",
+        mnemonic = "KotlinKsp",
         inputs = depset(
             direct = all_source_files + srcs.src_jars + ksp2_invoker_jars,
             transitive = [
@@ -543,7 +543,7 @@ def _run_ksp_builder_actions(
         executable = toolchains.kt.ksp2.files_to_run.executable,
         execution_requirements = _utils.add_dicts(
             toolchains.kt.execution_requirements,
-            {"worker-key-mnemonic": "KotlinKsp2"},
+            {"worker-key-mnemonic": "KotlinKsp"},
         ),
         arguments = [
             ctx.actions.args().add_all(toolchains.kt.builder_args),
