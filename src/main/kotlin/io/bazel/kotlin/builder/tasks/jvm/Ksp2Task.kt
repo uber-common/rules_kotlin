@@ -30,6 +30,8 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 import java.util.jar.Manifest
@@ -48,6 +50,13 @@ import java.util.zip.ZipFile
  * This is a separate command from the main Build command for cleaner separation.
  */
 class Ksp2Task : Work {
+  // Cache processor classloaders across worker invocations, keyed by the (sorted) processor
+  // classpath. The persistent worker reuses a single Ksp2Task instance, so without this cache a
+  // fresh URLClassLoader is created for every action; the loaded class metadata is never reclaimed
+  // and the worker eventually dies with `OutOfMemoryError: Compressed class space`. Targets sharing
+  // the same KSP processors now reuse one classloader instead of creating hundreds.
+  private val classLoaderCache = ConcurrentHashMap<List<String>, ClassLoaderEntry>()
+
   companion object {
     private val FLAGFILE_RE = Pattern.compile("""^--flagfile=((.*)-(\d+).params)$""").toRegex()
 
@@ -74,6 +83,30 @@ class Ksp2Task : Work {
         val eqIdx = entry.indexOf('=')
         if (eqIdx >= 0) entry.substring(0, eqIdx) to entry.substring(eqIdx + 1) else entry to ""
       }
+
+    /**
+     * Fingerprints a processor classpath by path, size, and jar contents. Bazel can reuse the same
+     * output path after rebuilding a processor, so a path-only cache key is insufficient.
+     */
+    fun fingerprintOf(sortedClasspath: List<String>): String {
+      val digest = MessageDigest.getInstance("SHA-256")
+      val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+      for (path in sortedClasspath) {
+        val file = File(path)
+        digest.update(path.toByteArray(StandardCharsets.UTF_8))
+        digest.update(0.toByte())
+        digest.update(file.length().toString().toByteArray(StandardCharsets.UTF_8))
+        digest.update(0.toByte())
+        Files.newInputStream(file.toPath()).use { input ->
+          while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+          }
+        }
+      }
+      return digest.digest().joinToString("") { "%02x".format(it) }
+    }
   }
 
   override fun invoke(
@@ -175,47 +208,23 @@ class Ksp2Task : Work {
         sourceRoots.add(stagedSourcesDir.toString())
       }
 
-      // Create classloader with KSP2 jars and processor jars
+      // Reuse a cached classloader (keyed by processor classpath) to avoid exhausting compressed
+      // class space across the many actions a persistent worker handles.
       val processorClasspath = argMap.optional(Ksp2Flags.PROCESSOR_CLASSPATH) ?: emptyList()
-      val processorUrls = processorClasspath.map { File(it).toURI().toURL() }.toTypedArray()
-      val kspClassLoader = URLClassLoader(processorUrls, ClassLoader.getSystemClassLoader())
+      val entry = getOrCreateEntry(processorClasspath)
 
       val processorOptions = parseKspOptions(argMap.optional(Ksp2Flags.KSP_OPTIONS) ?: emptyList())
       val experimentalPsiResolution =
         argMap.optionalSingle(Ksp2Flags.EXPERIMENTAL_PSI_RESOLUTION)?.toBoolean() ?: false
 
-      // Load Ksp2Invoker via reflection (it's compiled against KSP2 classes)
-      val invokerClass = kspClassLoader.loadClass("io.bazel.kotlin.ksp2.Ksp2Invoker")
       val invoker =
-        invokerClass
+        entry.invokerClass
           .getConstructor(ClassLoader::class.java)
-          .newInstance(kspClassLoader)
-      val executeMethod =
-        invokerClass.getMethod(
-          "execute",
-          String::class.java, // moduleName
-          List::class.java, // sourceRoots
-          List::class.java, // javaSourceRoots
-          List::class.java, // libraries
-          File::class.java, // kotlinOutputDir
-          File::class.java, // javaOutputDir
-          File::class.java, // classOutputDir
-          File::class.java, // resourceOutputDir
-          File::class.java, // cachesDir
-          File::class.java, // projectBaseDir
-          File::class.java, // outputBaseDir
-          String::class.java, // jvmTarget
-          String::class.java, // languageVersion
-          String::class.java, // apiVersion
-          File::class.java, // jdkHome
-          Map::class.java, // processorOptions
-          Boolean::class.javaPrimitiveType, // experimentalPsiResolution
-          Int::class.java, // logLevel
-        )
+          .newInstance(entry.classLoader)
 
       // Execute KSP2
       val code =
-        executeMethod.invoke(
+        entry.executeMethod.invoke(
           invoker,
           moduleName,
           sourceRoots.map { File(it) },
@@ -267,6 +276,54 @@ class Ksp2Task : Work {
         // Ignore cleanup errors
       }
     }
+  }
+
+  private fun getOrCreateEntry(processorClasspath: List<String>): ClassLoaderEntry {
+    // Sort for cache matching, but keep the original order for the URLClassLoader so class
+    // loading priority is preserved.
+    val key = processorClasspath.sorted()
+    val fingerprint = fingerprintOf(key)
+    return classLoaderCache.compute(key) { _, existing ->
+      if (existing != null && existing.fingerprint == fingerprint) {
+        return@compute existing
+      }
+
+      // A processor jar may have been rebuilt at the same Bazel output path. Close the stale
+      // loader before replacing it so repeated edits do not leak class metadata or open jars.
+      if (existing != null) {
+        runCatching { existing.classLoader.close() }
+      }
+
+      val urls = processorClasspath.map { File(it).toURI().toURL() }.toTypedArray()
+      // Use the platform classloader (JDK modules only, no Kotlin classes) as parent so the
+      // processor loads its own kotlin-stdlib/kotlin-reflect from its classpath into one
+      // classloader, keeping Kotlin reflection working in KSP processors.
+      val cl = URLClassLoader(urls, ClassLoader.getPlatformClassLoader())
+      val invokerClass = cl.loadClass("io.bazel.kotlin.ksp2.Ksp2Invoker")
+      val executeMethod =
+        invokerClass.getMethod(
+          "execute",
+          String::class.java, // moduleName
+          List::class.java, // sourceRoots
+          List::class.java, // javaSourceRoots
+          List::class.java, // libraries
+          File::class.java, // kotlinOutputDir
+          File::class.java, // javaOutputDir
+          File::class.java, // classOutputDir
+          File::class.java, // resourceOutputDir
+          File::class.java, // cachesDir
+          File::class.java, // projectBaseDir
+          File::class.java, // outputBaseDir
+          String::class.java, // jvmTarget
+          String::class.java, // languageVersion
+          String::class.java, // apiVersion
+          File::class.java, // jdkHome
+          Map::class.java, // processorOptions
+          Boolean::class.javaPrimitiveType, // experimentalPsiResolution
+          Int::class.java, // logLevel
+        )
+      ClassLoaderEntry(cl, invokerClass, executeMethod, fingerprint)
+    }!!
   }
 
   /**

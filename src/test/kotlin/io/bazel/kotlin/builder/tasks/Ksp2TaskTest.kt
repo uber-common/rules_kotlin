@@ -18,9 +18,12 @@ package io.bazel.kotlin.builder.tasks
 
 import com.google.common.truth.Truth.assertThat
 import io.bazel.kotlin.builder.tasks.jvm.Ksp2Task.Companion.Ksp2Flags
+import io.bazel.kotlin.builder.tasks.jvm.Ksp2Task.Companion.fingerprintOf
 import io.bazel.kotlin.builder.tasks.jvm.Ksp2Task.Companion.parseKspOptions
 import io.bazel.kotlin.builder.utils.ArgMap
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
@@ -29,6 +32,9 @@ import org.junit.runners.JUnit4
  */
 @RunWith(JUnit4::class)
 class Ksp2TaskTest {
+  @get:Rule
+  val tmp = TemporaryFolder()
+
   @Test
   fun testKsp2ModuleName() {
     val args =
@@ -185,5 +191,37 @@ class Ksp2TaskTest {
   @Test
   fun testParseKspOptionsEmptyList() {
     assertThat(parseKspOptions(emptyList())).isEmpty()
+  }
+
+  @Test
+  fun testFingerprintIsDeterministic() {
+    val jar = tmp.newFile("a.jar").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+    val classpath = listOf(jar.absolutePath)
+    assertThat(fingerprintOf(classpath)).isEqualTo(fingerprintOf(classpath))
+  }
+
+  @Test
+  fun testFingerprintChangesWhenContentChangesAtSamePath() {
+    val jar = tmp.newFile("a.jar").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+    val classpath = listOf(jar.absolutePath)
+    val before = fingerprintOf(classpath)
+
+    jar.writeBytes(byteArrayOf(4, 5, 6, 7))
+
+    assertThat(fingerprintOf(classpath)).isNotEqualTo(before)
+  }
+
+  @Test
+  fun testFingerprintDiffersForDifferentPaths() {
+    val jar1 = tmp.newFile("a.jar").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+    val jar2 = tmp.newFile("b.jar").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+    assertThat(fingerprintOf(listOf(jar1.absolutePath)))
+      .isNotEqualTo(fingerprintOf(listOf(jar2.absolutePath)))
+  }
+
+  @Test
+  fun testFingerprintIsHexEncoded() {
+    val jar = tmp.newFile("a.jar").apply { writeBytes(byteArrayOf(1)) }
+    assertThat(fingerprintOf(listOf(jar.absolutePath))).matches("[0-9a-f]{64}")
   }
 }
