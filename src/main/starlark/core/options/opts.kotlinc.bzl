@@ -57,6 +57,11 @@ def _map_nullability_annotations(values):
 def _map_optin_class_to_flag(values):
     return ["-opt-in=%s" % v for v in values]
 
+def _map_cache_salt_to_flag(value):
+    if not value:
+        return None
+    return ["-opt-in=rules_kotlin.cache.salt.%s" % value]
+
 def _map_backend_threads_to_flag(n):
     if n == 1:
         return None
@@ -73,6 +78,15 @@ def _map_jdk_release_to_flag(version):
     return ["-Xjdk-release=%s" % version]
 
 _KOPTS_ALL = {
+    "cache_salt": struct(
+        args = dict(
+            default = "",
+            doc = "Opaque salt value to invalidate the KotlinCompile action cache. Changing this value forces recompilation without affecting behavior.",
+        ),
+        type = attr.string,
+        value_to_flag = None,
+        map_value_to_flag = _map_cache_salt_to_flag,
+    ),
     "include_stdlibs": struct(
         args = dict(
             default = "all",
