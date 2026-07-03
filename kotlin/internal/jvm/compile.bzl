@@ -754,6 +754,12 @@ def _kt_jvm_produce_output_jar_actions(
     annotation_processors = _plugin_mappers.targets_to_annotation_processors(ctx.attr.plugins + ctx.attr.deps)
     ksp_annotation_processors = _plugin_mappers.targets_to_ksp_annotation_processors(ctx.attr.plugins + ctx.attr.deps)
     ksp_options = _plugin_mappers.targets_to_ksp_options(ctx.attr.plugins + ctx.attr.deps)
+
+    # Merge per-target KSP options declared via the `ksp_opts` rule attribute (Uber extension).
+    _target_ksp_opts = getattr(ctx.attr, "ksp_opts", None)
+    if _target_ksp_opts:
+        ksp_options = dict(ksp_options)
+        ksp_options.update(_target_ksp_opts)
     transitive_runtime_jars = _plugin_mappers.targets_to_transitive_runtime_jars(ctx.attr.plugins + ctx.attr.deps)
     plugins = _new_plugins_from(ctx.attr.plugins + _exported_plugins(deps = ctx.attr.deps))
 

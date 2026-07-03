@@ -245,6 +245,11 @@ _common_attr = utils.add_dicts(
             default = [],
             mandatory = False,
         ),
+        "ksp_opts": attr.string_dict(
+            doc = """KSP options to be used when compiling this target.""",
+            default = {},
+            mandatory = False,
+        ),
         "kotlinc_opts": attr.label(
             doc = """Kotlinc options to be used when compiling this target. These opts if provided
             will be used instead of the ones provided to the toolchain.""",
