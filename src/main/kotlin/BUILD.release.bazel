@@ -115,6 +115,20 @@ java_binary(
     name = "ksp2",
     data = KOTLIN_STDLIBS,
     jvm_flags = [
+        # Keep JVM unified logging (e.g. codecache-full warnings) off stdout: the persistent
+        # worker uses stdout for the WorkResponse protobuf, so any JVM log there corrupts it
+        # ("Worker process returned an unparseable WorkResponse").
+        "-Xlog:disable",
+        "-Xlog:all=warning:stderr:uptime,level,tags",
+        # The legacy HotSpot warning() path (e.g. "OpenJDK 64-Bit Server VM warning: CodeHeap
+        # ... is full") writes to defaultStream, which is stdout by default and is NOT governed
+        # by -Xlog. That also corrupts the WorkResponse protobuf. Force all VM output to stderr.
+        "-XX:+DisplayVMOutputToStderr",
+        # Long-lived KSP2 workers JIT a lot; the default code cache fills, disabling the
+        # compiler and emitting the warning above. Give it headroom, and specifically size the
+        # non-profiled nmethods segment (the one that fills on large builds).
+        "-XX:ReservedCodeCacheSize=1g",
+        "-XX:NonProfiledCodeHeapSize=512m",
         "-XX:-MaxFDLimit",
     ],
     main_class = "io.bazel.kotlin.builder.cmd.Ksp2",
