@@ -1041,8 +1041,15 @@ def _run_kt_java_builder_actions(
                 ),
             ]
 
-            # Add the kaptish annotation processor plugin
+            # Add the kaptish javac Plugin (on the processorpath via JavaPluginInfo) and activate
+            # it with -Xplugin:Kaptish. Pass this module's compiled-Kotlin ABI jar via a -XD option
+            # (NOT a -Xplugin argument): Bazel's JavaBuilder tokenizes javacopts on whitespace, so a
+            # "-Xplugin:Kaptish <path>" value would be split. The plugin reads -XDkaptishSelfjar from
+            # javac Options. kt_compile_jar is on the compile classpath (a guaranteed action input)
+            # and carries class names, signatures and annotations.
             kaptish_plugins = [toolchains.kt.kaptish_plugin[JavaPluginInfo]]
+            javac_opts.append("-Xplugin:Kaptish")
+            javac_opts.append("-XDkaptishSelfjar=" + kt_compile_jar.path)
         else:
             # Non-kaptish mode: Kotlin/KAPT takes care of annotation processing
             # Note that JavaBuilder "discovers" annotation processors in `deps` also.

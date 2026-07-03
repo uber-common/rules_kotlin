@@ -43,8 +43,9 @@ java_import(
 
 java_plugin(
     name = "kaptish",
-    generates_api = True,
-    processor_class = "io.bazel.kotlin.plugin.kaptish.KotlinClassInjectorPlugin",
+    # No processor_class: this is a javac Plugin (com.sun.source.util.Plugin) activated via
+    # -Xplugin:Kaptish, not an annotation processor. The java_plugin just places kaptish.jar
+    # on javac's -processorpath so javac's ServiceLoader can discover the Plugin.
     visibility = ["//visibility:public"],
     deps = [":kaptish-lib"],
 )

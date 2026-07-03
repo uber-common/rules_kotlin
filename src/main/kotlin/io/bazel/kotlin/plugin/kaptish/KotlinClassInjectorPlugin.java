@@ -15,199 +15,111 @@
  */
 package io.bazel.kotlin.plugin.kaptish;
 
+import com.sun.source.util.JavacTask;
+import com.sun.source.util.Plugin;
+import com.sun.tools.javac.api.BasicJavacTask;
 import com.sun.tools.javac.main.Arguments;
-import com.sun.tools.javac.processing.JavacProcessingEnvironment;
-import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.main.Option;
+import com.sun.tools.javac.util.Options;
 
-import javax.annotation.processing.AbstractProcessor;
-import javax.annotation.processing.ProcessingEnvironment;
-import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.annotation.processing.SupportedSourceVersion;
-import javax.lang.model.SourceVersion;
-import javax.lang.model.element.TypeElement;
-import javax.tools.Diagnostic;
 import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 /**
- * Annotation processor that injects compiled Kotlin class names into the annotation
- * processing phase, allowing other annotation processors to see Kotlin classes.
+ * "Kaptish" is a javac compiler plugin that injects the module's compiled-Kotlin class names
+ * into javac's annotation-processing phase, so Java annotation processors (Dagger, AutoValue,
+ * ...) can see the module's Kotlin @Module/@Component/@AutoValue types without KAPT stubs.
  *
- * This enables "kaptish" mode where:
- * 1. Kotlin is compiled first to .class files
- * 2. This processor injects those class names into javac's AP phase
- * 3. Other annotation processors run on the compiled Kotlin classes (no stubs needed)
+ * <p>This must be a javac {@link Plugin} (not an {@code AbstractProcessor}): the class names have
+ * to be added to {@link Arguments#getClassNames()} at task {@code init} time, BEFORE javac
+ * computes the initial set of root elements for annotation processing. An annotation processor's
+ * {@code init} runs too late for that, which is why the previous processor-based implementation
+ * failed to make Kotlin @Module companions visible to Dagger.
  *
- * The processor scans the classpath for JARs containing Kotlin-compiled classes
- * (identified by the presence of .kotlin_module files) and injects their
- * class names into the compilation.
+ * <p>The jar(s) holding the module's compiled Kotlin classes are passed as plugin arguments (the
+ * build wires them via {@code -Xplugin:Kaptish <abiJarPath>}). Only outer classes are injected;
+ * processors reach nested types (e.g. a Kotlin {@code companion object}) via enclosed elements.
  */
-@SupportedAnnotationTypes("*")
-@SupportedSourceVersion(SourceVersion.RELEASE_11)
-public class KotlinClassInjectorPlugin extends AbstractProcessor {
+public class KotlinClassInjectorPlugin implements Plugin {
 
-    private boolean injected = false;
+  @Override
+  public String getName() {
+    return "Kaptish";
+  }
 
-    @Override
-    public synchronized void init(ProcessingEnvironment processingEnv) {
-        super.init(processingEnv);
+  @Override
+  public void init(JavacTask task, String... args) {
+    if (!(task instanceof BasicJavacTask)) {
+      return;
+    }
+    BasicJavacTask basicTask = (BasicJavacTask) task;
+    Options options = Options.instance(basicTask.getContext());
 
-        if (injected) {
-            return;
-        }
-        injected = true;
-
-        // Collect all classes from Kotlin JARs on the classpath
-        Set<String> allClasses = new HashSet<>();
-
-        // Find Kotlin JARs on the classpath and extract class names
-        List<String> classpathJars = findKotlinJarsOnClasspath();
-        for (String jarPath : classpathJars) {
-            Collection<String> classes = getClassesFromJar(jarPath);
-            allClasses.addAll(classes);
-        }
-
-        if (!allClasses.isEmpty()) {
-            // Try to inject class names into javac's Arguments
-            try {
-                injectClassNames(processingEnv, allClasses);
-            } catch (Exception e) {
-                processingEnv.getMessager().printMessage(
-                    Diagnostic.Kind.NOTE,
-                    "Kaptish: Could not inject class names: " + e.getMessage()
-                );
-            }
-        }
+    // Respect -proc:none (no annotation processing requested).
+    if ("none".equals(options.get(Option.PROC))) {
+      return;
     }
 
-    /**
-     * Inject class names into javac's Arguments.
-     */
-    private void injectClassNames(ProcessingEnvironment processingEnv, Set<String> classNames) {
-        JavacProcessingEnvironment javacEnv = unwrap(processingEnv);
-        if (javacEnv == null) {
-            return;
+    // The build passes the module's compiled-Kotlin ABI jar via -XDkaptishSelfjar=<path>.
+    // A -XD option is used (rather than a -Xplugin argument) because Bazel's JavaBuilder
+    // tokenizes javacopts on whitespace, which would split a "-Xplugin:Kaptish <path>" value.
+    List<String> jarPaths = new ArrayList<>();
+    String selfJar = options.get("kaptishSelfjar");
+    if (selfJar != null && !selfJar.isEmpty()) {
+      for (String p : selfJar.split(File.pathSeparator)) {
+        if (!p.isEmpty()) {
+          jarPaths.add(p);
         }
-
-        Context context = javacEnv.getContext();
-        Arguments arguments = Arguments.instance(context);
-        arguments.getClassNames().addAll(classNames);
+      }
+    }
+    // Also accept any explicit -Xplugin arguments (jar paths) for flexibility.
+    for (String p : args) {
+      if (p != null && !p.isEmpty()) {
+        jarPaths.add(p);
+      }
     }
 
-    /**
-     * Unwrap the ProcessingEnvironment to get the underlying JavacProcessingEnvironment.
-     *
-     * Reflection is used here to handle delegating ProcessingEnvironment wrappers
-     * (e.g., from Gradle or other build tools). This is unavoidable since we don't
-     * know wrapper class types at compile time.
-     */
-    private JavacProcessingEnvironment unwrap(ProcessingEnvironment processingEnv) {
-        if (processingEnv instanceof JavacProcessingEnvironment) {
-            return (JavacProcessingEnvironment) processingEnv;
-        }
-
-        // Try to unwrap delegating processors (e.g., from Gradle or other build tools)
-        try {
-            Field delegateField = processingEnv.getClass().getDeclaredField("delegate");
-            delegateField.setAccessible(true);
-            return unwrap((ProcessingEnvironment) delegateField.get(processingEnv));
-        } catch (Exception e) {
-            return null;
-        }
+    List<String> classes = new ArrayList<>();
+    for (String entry : jarPaths) {
+      if (new File(entry).exists()) {
+        classes.addAll(getClassesFromJar(entry));
+      }
     }
 
-    @Override
-    public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        // This processor doesn't generate any code itself
-        return false;
+    if (!classes.isEmpty()) {
+      Arguments.instance(basicTask.getContext()).getClassNames().addAll(classes);
     }
+  }
 
-    /**
-     * Find Kotlin-compiled JARs on the classpath.
-     * Kotlin JARs are identified by containing .kotlin_module files.
-     */
-    private List<String> findKotlinJarsOnClasspath() {
-        List<String> result = new ArrayList<>();
-
-        // Get classpath from system property
-        String classpath = System.getProperty("java.class.path");
-        if (classpath == null || classpath.isEmpty()) {
-            return result;
+  /** Extract top-level (non-inner) class names from a jar. */
+  private Collection<String> getClassesFromJar(String path) {
+    List<String> classes = new ArrayList<>();
+    try (JarFile jar = new JarFile(path)) {
+      Enumeration<JarEntry> entries = jar.entries();
+      while (entries.hasMoreElements()) {
+        String name = entries.nextElement().getName();
+        if (!name.endsWith(".class")) {
+          continue;
         }
-
-        for (String entry : classpath.split(File.pathSeparator)) {
-            if (entry.endsWith(".jar") && new File(entry).exists()) {
-                try (JarFile jar = new JarFile(entry)) {
-                    // Check if this JAR contains Kotlin-compiled classes
-                    // by looking for .kotlin_module files
-                    boolean hasKotlinModule = false;
-                    Enumeration<JarEntry> entries = jar.entries();
-                    while (entries.hasMoreElements()) {
-                        JarEntry jarEntry = entries.nextElement();
-                        if (jarEntry.getName().endsWith(".kotlin_module")) {
-                            hasKotlinModule = true;
-                            break;
-                        }
-                    }
-
-                    if (hasKotlinModule) {
-                        result.add(entry);
-                    }
-                } catch (IOException e) {
-                    // Skip JARs we can't read
-                }
-            }
+        String className = name.substring(0, name.length() - ".class".length()).replace("/", ".");
+        String simpleName = className.substring(className.lastIndexOf(".") + 1);
+        // Skip inner/synthetic classes (processed with their enclosing class) and infos.
+        if (simpleName.contains("$")) {
+          continue;
         }
-
-        return result;
+        if (className.endsWith("module-info") || className.endsWith("package-info")) {
+          continue;
+        }
+        classes.add(className);
+      }
+    } catch (Exception e) {
+      // If the jar can't be read, inject nothing and let javac proceed normally.
     }
-
-    /**
-     * Extract top-level class names from a JAR file.
-     *
-     * @param path Path to the JAR file
-     * @return Collection of fully-qualified class names (excluding inner classes)
-     */
-    private Collection<String> getClassesFromJar(String path) {
-        List<String> classes = new ArrayList<>();
-        try (JarFile jar = new JarFile(path)) {
-            Enumeration<JarEntry> entries = jar.entries();
-            while (entries.hasMoreElements()) {
-                JarEntry entry = entries.nextElement();
-                String name = entry.getName();
-
-                if (name.endsWith(".class")) {
-                    String className = name
-                            .substring(0, name.length() - 6) // Remove ".class"
-                            .replace("/", ".");
-
-                    // Skip inner classes (they're processed with their enclosing class)
-                    String simpleName = className.substring(className.lastIndexOf(".") + 1);
-                    if (simpleName.contains("$")) {
-                        continue;
-                    }
-
-                    // Skip module-info and package-info
-                    if (className.endsWith("module-info") || className.endsWith("package-info")) {
-                        continue;
-                    }
-
-                    classes.add(className);
-                }
-            }
-        } catch (IOException e) {
-            // If we can't read the JAR, return empty and let javac proceed normally
-        }
-        return classes;
-    }
+    return classes;
+  }
 }
