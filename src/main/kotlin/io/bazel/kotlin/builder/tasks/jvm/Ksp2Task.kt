@@ -31,6 +31,7 @@ import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.GregorianCalendar
 import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
@@ -107,6 +108,12 @@ class Ksp2Task : Work {
       }
       return digest.digest().joinToString("") { "%02x".format(it) }
     }
+
+    // Fixed epoch (1980-01-01 00:00:00 UTC) for reproducible jar timestamps.
+    // Matches Bazel's JarHelper.DEFAULT_TIMESTAMP convention.
+    private val FIXED_JAR_TIMESTAMP = GregorianCalendar(1980, 0, 1, 0, 0, 0).timeInMillis
+
+    private fun jarEntry(name: String) = JarEntry(name).also { it.time = FIXED_JAR_TIMESTAMP }
   }
 
   override fun invoke(
@@ -340,8 +347,17 @@ class Ksp2Task : Work {
         mainAttributes.putValue("Created-By", "rules_kotlin KSP2")
       }
 
-    JarOutputStream(FileOutputStream(outputPath), manifest).use { jar ->
-      val addedEntries = mutableSetOf<String>()
+    JarOutputStream(FileOutputStream(outputPath)).use { jar ->
+      // Write META-INF/MANIFEST.MF manually so we control the timestamp.
+      // The JarOutputStream(stream, manifest) constructor stamps it with
+      // System.currentTimeMillis(), breaking build determinism.
+      jar.putNextEntry(jarEntry("META-INF/"))
+      jar.closeEntry()
+      jar.putNextEntry(jarEntry("META-INF/MANIFEST.MF"))
+      manifest.write(jar)
+      jar.closeEntry()
+
+      val addedEntries = mutableSetOf("META-INF/", "META-INF/MANIFEST.MF")
 
       for (dir in directories) {
         if (!Files.exists(dir)) continue
@@ -356,7 +372,7 @@ class Ksp2Task : Work {
               val dirEntry = "$relativePath/"
               if (dirEntry !in addedEntries) {
                 addedEntries.add(dirEntry)
-                jar.putNextEntry(JarEntry(dirEntry))
+                jar.putNextEntry(jarEntry(dirEntry))
                 jar.closeEntry()
               }
             } else if (Files.isRegularFile(path)) {
@@ -367,7 +383,7 @@ class Ksp2Task : Work {
                 parentPath += parts[i] + "/"
                 if (parentPath !in addedEntries) {
                   addedEntries.add(parentPath)
-                  jar.putNextEntry(JarEntry(parentPath))
+                  jar.putNextEntry(jarEntry(parentPath))
                   jar.closeEntry()
                 }
               }
@@ -375,7 +391,7 @@ class Ksp2Task : Work {
               // Add file entry
               if (relativePath !in addedEntries) {
                 addedEntries.add(relativePath)
-                jar.putNextEntry(JarEntry(relativePath))
+                jar.putNextEntry(jarEntry(relativePath))
                 Files.copy(path, jar)
                 jar.closeEntry()
               }
