@@ -299,6 +299,48 @@ def _ksp_processor_classpath_isolation_test_impl(ctx):
 
 ksp_processor_classpath_isolation_test = analysistest.make(_ksp_processor_classpath_isolation_test_impl)
 
+def _ksp_opts_test_impl(ctx):
+    """Verify per-target ksp_opts reach the KSP2 action as --ksp_options flags."""
+    env = analysistest.begin(ctx)
+
+    actions = analysistest.target_actions(env)
+    ksp2_actions = [a for a in actions if a.mnemonic == "KotlinKsp2"]
+
+    asserts.true(
+        env,
+        len(ksp2_actions) > 0,
+        "Should have at least one KotlinKsp2 action",
+    )
+
+    argv = ksp2_actions[0].argv
+
+    # Collect all --ksp_options values from argv.
+    ksp_opts_entries = []
+    collecting = False
+    for arg in argv:
+        if arg == "--ksp_options":
+            collecting = True
+        elif collecting and arg.startswith("--"):
+            collecting = False
+        elif collecting:
+            ksp_opts_entries.append(arg)
+
+    asserts.true(
+        env,
+        len(ksp_opts_entries) > 0,
+        "Should have --ksp_options entries in KSP2 action argv",
+    )
+
+    asserts.true(
+        env,
+        "room.schemaLocation=/tmp/schemas" in ksp_opts_entries,
+        "Should contain room.schemaLocation=/tmp/schemas, got: %s" % ksp_opts_entries,
+    )
+
+    return analysistest.end(env)
+
+ksp_opts_test = analysistest.make(_ksp_opts_test_impl)
+
 def ksp_test_suite(name):
     """Create test suite for KSP2 integration tests.
 
@@ -320,5 +362,6 @@ def ksp_test_suite(name):
             ":ksp_javac_excludes_srcjars_test",
             ":ksp_javac_includes_srcjars_test",
             ":ksp_processor_classpath_isolation_test",
+            ":ksp_opts_test",
         ],
     )
