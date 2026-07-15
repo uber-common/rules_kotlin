@@ -15,7 +15,7 @@
 load("@rules_java//java:defs.bzl", "java_plugin")
 load("//kotlin:core.bzl", "kt_ksp_plugin")
 load("//kotlin:jvm.bzl", "kt_jvm_library")
-load(":ksp_test.bzl", "ksp_action_test", "ksp_conflicting_options_test", "ksp_javac_excludes_srcjars_test", "ksp_javac_includes_srcjars_test", "ksp_options_action_test", "ksp_outputs_test", "ksp_plugin_empty_options_provider_test", "ksp_plugin_options_provider_test", "ksp_processor_classpath_isolation_test", "ksp_single_action_test")
+load(":ksp_test.bzl", "ksp_action_test", "ksp_conflicting_options_test", "ksp_javac_excludes_srcjars_test", "ksp_javac_includes_srcjars_test", "ksp_options_action_test", "ksp_opts_test", "ksp_outputs_test", "ksp_plugin_empty_options_provider_test", "ksp_plugin_options_provider_test", "ksp_processor_classpath_isolation_test", "ksp_single_action_test")
 
 # Simple KSP plugin for testing (uses moshi which generates Kotlin code)
 kt_ksp_plugin(
@@ -229,6 +229,23 @@ ksp_processor_classpath_isolation_test(
     target_under_test = ":ksp_test_lib_with_kapt",
 )
 
+# Target with per-target KSP options for testing option passthrough.
+kt_jvm_library(
+    name = "ksp_test_lib_with_opts",
+    srcs = ["TestModel.kt"],
+    ksp_opts = {"room.schemaLocation": "/tmp/schemas"},
+    plugins = [":moshi_plugin"],
+    deps = [
+        "@kotlin_rules_maven//:com_squareup_moshi_moshi",
+        "@kotlin_rules_maven//:com_squareup_moshi_moshi_kotlin",
+    ],
+)
+
+ksp_opts_test(
+    name = "ksp_opts_test",
+    target_under_test = ":ksp_test_lib_with_opts",
+)
+
 test_suite(
     name = "ksp_tests",
     tests = [
@@ -237,6 +254,7 @@ test_suite(
         ":ksp_javac_excludes_srcjars_test",
         ":ksp_javac_includes_srcjars_test",
         ":ksp_options_action_test",
+        ":ksp_opts_test",
         ":ksp_outputs_test",
         ":ksp_plugin_empty_options_provider_test",
         ":ksp_plugin_options_provider_test",
