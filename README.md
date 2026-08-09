@@ -266,19 +266,42 @@ Additionally, you can add options for both tracing and timing of the bazel build
 
 The Build Tools API is a modern compilation interface provided by JetBrains for invoking the Kotlin compiler. It offers better integration and is required for incremental compilation support.
 
-**This feature is enabled by default.**
+**This feature is an explicit opt-in.** By default rules_kotlin compiles through the legacy `K2JVMCompiler`;
 
-To disable the Build Tools API and use the legacy compilation approach, add the following flag to your build:
+To enable the Build Tools API for the whole build, add the following flag:
 
 ```bash
-bazel build --@rules_kotlin//kotlin/settings:experimental_build_tools_api=false //your:target
+bazel build --@rules_kotlin//kotlin/settings:experimental_build_tools_api=true //your:target
 ```
 
 Or add it to your `.bazelrc` file:
 
 ```
-build --@rules_kotlin//kotlin/settings:experimental_build_tools_api=false
+build --@rules_kotlin//kotlin/settings:experimental_build_tools_api=true
 ```
+
+Alternatively, enable it for a single toolchain via `define_kt_toolchain(experimental_build_tools_api = True)`.
+Either switch is sufficient; both default to `False`.
+
+# Pruning transitive dependencies
+
+The experimental transitive dependency pruning mode normally removes every transitive dependency from the Kotlin
+compile classpath:
+
+```
+build --@rules_kotlin//kotlin/settings:experimental_prune_transitive_deps=True
+```
+
+Some Maven dependency graphs need to remain transitive. Their canonical repository names can be allow-listed globally
+with a comma-separated build setting:
+
+```
+build --@rules_kotlin//kotlin/settings:experimental_prune_transitive_deps_keep_transitive_repositories=maven,rules_jvm_external++maven+maven
+```
+
+Repository names omit the leading `@`. For Bzlmod extensions, use the canonical name (for example,
+`rules_jvm_external++maven+maven`); for `WORKSPACE` repositories, use the repository name (for example, `maven`).
+The allow-list is empty by default and has no effect unless transitive dependency pruning is enabled.
 
 # Workers
 

@@ -97,7 +97,7 @@ def _kotlin_toolchain_impl(ctx):
         experimental_reduce_classpath_mode = ctx.attr.experimental_reduce_classpath_mode,
         experimental_track_class_usage = ctx.attr.experimental_track_class_usage,
         experimental_track_resource_usage = ctx.attr.experimental_track_resource_usage,
-        experimental_build_tools_api = ctx.attr.experimental_build_tools_api,
+        experimental_build_tools_api = ctx.attr.experimental_build_tools_api or ctx.attr._experimental_build_tools_api_setting[BuildSettingInfo].value,
         javac_options = ctx.attr.javac_options[JavacOptions] if ctx.attr.javac_options else None,
         kotlinc_options = ctx.attr.kotlinc_options[KotlincOptions] if ctx.attr.kotlinc_options else None,
         empty_jar = ctx.file._empty_jar,
@@ -220,27 +220,6 @@ _kt_toolchain = rule(
                 "off",
                 "warn",
                 "error",
-            ],
-        ),
-        "experimental_track_class_usage": attr.string(
-            doc = """Enable per-class compilation avoidance. Records which specific classes
-            from each dependency are used during compilation, along with SHA-256 hashes
-            of their bytecode. Build systems can use this data to skip recompilation when
-            a dependency changes but the used classes remain unchanged.""",
-            default = "off",
-            values = [
-                "off",
-                "on",
-            ],
-        ),
-        "experimental_track_resource_usage": attr.string(
-            doc = """Enable Android R class resource tracking. Records which R class fields
-            (e.g., R.string.app_name) are referenced during compilation. Used for
-            compilation avoidance with Android resources.""",
-            default = "off",
-            values = [
-                "off",
-                "on",
             ],
         ),
         "experimental_treat_internal_as_private_in_abi_jars": attr.bool(
@@ -373,6 +352,12 @@ _kt_toolchain = rule(
             cfg = "target",
             default = Label("//third_party:empty.jdeps"),
         ),
+        "_experimental_build_tools_api_setting": attr.label(
+            doc = """Build setting enabling compilation with the Build Tools API for every toolchain in
+            the build. The effective toggle is this setting OR-ed with the per-toolchain
+            experimental_build_tools_api attr; both default to False (legacy compilation).""",
+            default = Label("//kotlin/settings:experimental_build_tools_api"),
+        ),
         "_experimental_ksp2_psi_resolution": attr.label(
             doc = """If enabled, KSP2 uses its experimental PSI-based symbol resolution strategy
             (KSPJvmConfig.experimentalPsiResolution) instead of the default Analysis API strategy.""",
@@ -429,8 +414,8 @@ def define_kt_toolchain(
         experimental_strict_kotlin_deps = None,
         experimental_report_unused_deps = None,
         experimental_reduce_classpath_mode = None,
-        experimental_track_class_usage = None,
-        experimental_track_resource_usage = None,
+        experimental_track_class_usage = False,
+        experimental_track_resource_usage = False,
         experimental_multiplex_workers = None,
         experimental_multiplex_sandboxing = None,
         supports_path_mapping = None,
