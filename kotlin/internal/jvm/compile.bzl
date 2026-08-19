@@ -923,6 +923,7 @@ def _kt_jvm_produce_output_jar_actions(
                 jdeps = output_jdeps,
                 jars = [struct(
                     class_jar = output_jar,
+                    generated_src_jars = generated_src_jars,
                     ijar = compile_jar,
                     source_jars = [source_jar],
                 )],
