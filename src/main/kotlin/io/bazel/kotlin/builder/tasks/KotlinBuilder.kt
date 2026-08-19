@@ -16,7 +16,6 @@
  */
 package io.bazel.kotlin.builder.tasks
 
-import io.bazel.kotlin.builder.tasks.jvm.KotlinJvmTaskExecutor
 import io.bazel.kotlin.builder.toolchain.CompilationStatusException
 import io.bazel.kotlin.builder.toolchain.CompilationTaskContext
 import io.bazel.kotlin.builder.utils.ArgMap
@@ -37,7 +36,7 @@ import java.util.regex.Pattern
 
 @Suppress("MemberVisibilityCanBePrivate")
 class KotlinBuilder(
-  private val jvmTaskExecutor: KotlinJvmTaskExecutor,
+  private val jvmTaskExecutor: JvmTaskExecutor,
 ) {
   companion object {
     @JvmStatic

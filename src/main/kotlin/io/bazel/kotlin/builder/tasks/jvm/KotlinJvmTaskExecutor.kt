@@ -16,6 +16,7 @@
  */
 package io.bazel.kotlin.builder.tasks.jvm
 
+import io.bazel.kotlin.builder.tasks.JvmTaskExecutor
 import io.bazel.kotlin.builder.toolchain.CompilationStatusException
 import io.bazel.kotlin.builder.toolchain.CompilationTaskContext
 import io.bazel.kotlin.builder.toolchain.KotlinToolchain
@@ -30,7 +31,7 @@ const val X_FRIENDS_PATH_SEPARATOR = ","
 class KotlinJvmTaskExecutor(
   private val compilerBuilder: KotlinToolchain.KotlincInvokerBuilder,
   private val plugins: InternalCompilerPlugins,
-) {
+) : JvmTaskExecutor {
   private fun combine(
     one: Throwable?,
     two: Throwable?,
@@ -45,7 +46,7 @@ class KotlinJvmTaskExecutor(
     }
   }
 
-  fun execute(
+  override fun execute(
     context: CompilationTaskContext,
     task: JvmCompilationTask,
   ) {
