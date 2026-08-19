@@ -868,6 +868,7 @@ def _kt_jvm_produce_output_jar_actions(
                 jdeps = output_jdeps,
                 jars = [struct(
                     class_jar = output_jar,
+                    generated_src_jars = generated_src_jars,
                     ijar = compile_jar,
                     source_jars = [source_jar],
                 )],
@@ -990,6 +991,7 @@ def _run_kt_java_builder_actions(
 
         compile_jars.append(kt_compile_jar)
         output_jars.append(kt_runtime_jar)
+
         # Always expose the Kotlin ABI jar to the Java compilation so javac can resolve
         # Kotlin symbols. Historically this was skipped when KAPT ran (relying on KAPT's
         # generated Java stubs), but KAPT stub generation is empty under the K2/Kotlin 2.3
