@@ -18,12 +18,35 @@
 package io.bazel.kotlin.builder.cmd
 
 import io.bazel.kotlin.builder.tasks.CompileKotlin
+import io.bazel.kotlin.builder.tasks.JvmTaskExecutor
 import io.bazel.kotlin.builder.tasks.KotlinBuilder
 import io.bazel.kotlin.builder.tasks.jvm.InternalCompilerPlugins
 import io.bazel.kotlin.builder.tasks.jvm.KotlinJvmTaskExecutor
+import io.bazel.kotlin.builder.tasks.jvm.btapi.BtapiInvoker
+import io.bazel.kotlin.builder.tasks.jvm.btapi.BtapiTaskExecutor
+import io.bazel.kotlin.builder.toolchain.CompilationTaskContext
 import io.bazel.kotlin.builder.toolchain.KotlinToolchain
+import io.bazel.kotlin.model.JvmCompilationTask
 import io.bazel.worker.Worker
 import kotlin.system.exitProcess
+
+private class DispatchingTaskExecutor(
+  private val legacyExecutor: KotlinJvmTaskExecutor,
+  btapiFactory: () -> BtapiTaskExecutor,
+) : JvmTaskExecutor {
+  private val btapiExecutor: BtapiTaskExecutor by lazy(btapiFactory)
+
+  override fun execute(
+    context: CompilationTaskContext,
+    task: JvmCompilationTask,
+  ) {
+    if (context.info.buildToolsApi) {
+      btapiExecutor.execute(context, task)
+    } else {
+      legacyExecutor.execute(context, task)
+    }
+  }
+}
 
 object Build {
   @JvmStatic
@@ -38,8 +61,11 @@ object Build {
             toolchain.kapt3Plugin,
             toolchain.jdepsGen,
           )
-        val compilerBuilder = KotlinToolchain.KotlincInvokerBuilder(toolchain)
-        val jvmTaskExecutor = KotlinJvmTaskExecutor(compilerBuilder, plugins)
+        val jvmTaskExecutor =
+          DispatchingTaskExecutor(
+            legacyExecutor = KotlinJvmTaskExecutor(toolchain, plugins),
+            btapiFactory = { BtapiTaskExecutor(BtapiInvoker(toolchain), plugins) },
+          )
         val builder = KotlinBuilder(jvmTaskExecutor)
         start(CompileKotlin(builder))
       }.run(::exitProcess)

@@ -105,7 +105,7 @@ class KotlinBuilderBuildTest {
         File(Deps.Dep.fromLabel("@kotlinx_serialization_json_jvm//file").singleCompileJar()),
       )
     return KotlinJvmTaskExecutor(
-      KotlinToolchain.KotlincInvokerBuilder(toolchain),
+      toolchain,
       InternalCompilerPlugins(
         toolchain.jvmAbiGen,
         toolchain.skipCodeGen,

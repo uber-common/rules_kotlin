@@ -22,12 +22,15 @@ import io.bazel.kotlin.builder.Deps.AnnotationProcessor;
 import io.bazel.kotlin.builder.Deps.Dep;
 import io.bazel.kotlin.builder.tasks.jvm.InternalCompilerPlugins;
 import io.bazel.kotlin.builder.tasks.jvm.KotlinJvmTaskExecutor;
+import io.bazel.kotlin.builder.tasks.jvm.btapi.BtapiInvoker;
+import io.bazel.kotlin.builder.tasks.jvm.btapi.BtapiTaskExecutor;
 import io.bazel.kotlin.builder.toolchain.CompilationTaskContext;
 import io.bazel.kotlin.builder.toolchain.KotlinToolchain;
 import io.bazel.kotlin.model.CompilationTaskInfo;
 import io.bazel.kotlin.model.JvmCompilationTask;
 import io.bazel.kotlin.model.KotlinToolchainInfo;
 
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.function.BiConsumer;
@@ -60,6 +63,7 @@ public final class KotlinJvmTestBuilder extends KotlinAbstractTestBuilder<JvmCom
 
     private final TaskBuilder taskBuilderInstance = new TaskBuilder();
     private static KotlinJvmTaskExecutor jvmTaskExecutor;
+    private static BtapiTaskExecutor btapiTaskExecutor;
 
     @Override
     void setupForNext(CompilationTaskInfo.Builder taskInfo) {
@@ -92,7 +96,17 @@ public final class KotlinJvmTestBuilder extends KotlinAbstractTestBuilder<JvmCom
 
     @SafeVarargs
     public final Dep runCompileTask(Consumer<TaskBuilder>... setup) {
-        return executeTask(jvmTaskExecutor()::execute, setup);
+        // Mirror the worker's dispatch: tasks flagged for the Build Tools API run through the
+        // typed executor, everything else through the legacy executor.
+        return executeTask(
+                (context, task) -> {
+                    if (task.getInfo().getBuildToolsApi()) {
+                        btapiTaskExecutor().execute(context, task);
+                    } else {
+                        jvmTaskExecutor().execute(context, task);
+                    }
+                },
+                setup);
     }
 
     private static KotlinJvmTaskExecutor jvmTaskExecutor() {
@@ -104,11 +118,36 @@ public final class KotlinJvmTestBuilder extends KotlinAbstractTestBuilder<JvmCom
                     toolchain.getKapt3Plugin(),
                     toolchain.getJdepsGen()
             );
-            KotlinToolchain.KotlincInvokerBuilder compilerBuilder =
-                    new KotlinToolchain.KotlincInvokerBuilder(toolchain);
-            jvmTaskExecutor = new KotlinJvmTaskExecutor(compilerBuilder, plugins);
+            jvmTaskExecutor = new KotlinJvmTaskExecutor(toolchain, plugins);
         }
         return jvmTaskExecutor;
+    }
+
+    private static BtapiTaskExecutor btapiTaskExecutor() {
+        if (btapiTaskExecutor == null) {
+            KotlinToolchain toolchain = toolchainForTest();
+            InternalCompilerPlugins plugins = new InternalCompilerPlugins(
+                    toolchain.getJvmAbiGen(),
+                    toolchain.getSkipCodeGen(),
+                    toolchain.getKapt3Plugin(),
+                    toolchain.getJdepsGen()
+            );
+            btapiTaskExecutor = new BtapiTaskExecutor(new BtapiInvoker(toolchain), plugins);
+        }
+        return btapiTaskExecutor;
+    }
+
+    /**
+     * The class-file major version of a compiled class, read from the CLASSES output directory.
+     */
+    public final int classFileMajorVersion(String relativeClassPath) {
+        try {
+            byte[] bytes = java.nio.file.Files.readAllBytes(
+                    directory(DirectoryType.CLASSES).resolve(relativeClassPath));
+            return ((bytes[6] & 0xFF) << 8) | (bytes[7] & 0xFF);
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
     }
 
     private Dep executeTask(
@@ -132,13 +171,13 @@ public final class KotlinJvmTestBuilder extends KotlinAbstractTestBuilder<JvmCom
                     );
 
                     return Dep.builder()
-                            .label(taskBuilder.getInfo().getLabel())
+                            .label(task.getInfo().getLabel())
                             .compileJars(ImmutableList.of(
                                     outputs.getAbijar().isEmpty() ? outputs.getJar() : outputs.getAbijar()
                             ))
                             .jdeps(outputs.getJdeps())
-                            .runtimeDeps(ImmutableList.copyOf(taskBuilder.getInputs().getClasspathList()))
-                            .sourceJar(taskBuilder.getOutputs().getSrcjar())
+                            .runtimeDeps(ImmutableList.copyOf(task.getInputs().getClasspathList()))
+                            .sourceJar(outputs.getSrcjar())
                             .build();
                 });
     }
@@ -276,6 +315,16 @@ public final class KotlinJvmTestBuilder extends KotlinAbstractTestBuilder<JvmCom
                     .getToolchainInfoBuilder()
                     .getCommonBuilder()
                     .setLanguageVersion("2.0");
+            return this;
+        }
+
+        public TaskBuilder useBuildToolsApi() {
+            taskBuilder.getInfoBuilder().setBuildToolsApi(true);
+            return this;
+        }
+
+        public TaskBuilder addPassthroughFlags(String... flags) {
+            taskBuilder.getInfoBuilder().addAllPassthroughFlags(Arrays.asList(flags));
             return this;
         }
     }

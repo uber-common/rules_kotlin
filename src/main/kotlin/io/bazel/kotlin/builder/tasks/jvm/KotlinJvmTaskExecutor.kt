@@ -29,7 +29,7 @@ import io.bazel.kotlin.model.JvmCompilationTask
 const val X_FRIENDS_PATH_SEPARATOR = ","
 
 class KotlinJvmTaskExecutor(
-  private val compilerBuilder: KotlinToolchain.KotlincInvokerBuilder,
+  private val toolchain: KotlinToolchain,
   private val plugins: InternalCompilerPlugins,
 ) : JvmTaskExecutor {
   private fun combine(
@@ -50,7 +50,7 @@ class KotlinJvmTaskExecutor(
     context: CompilationTaskContext,
     task: JvmCompilationTask,
   ) {
-    val compiler = compilerBuilder.build(context.info.buildToolsApi)
+    val compiler = KotlinToolchain.KotlincInvoker(toolchain)
 
     val preprocessedTask =
       task

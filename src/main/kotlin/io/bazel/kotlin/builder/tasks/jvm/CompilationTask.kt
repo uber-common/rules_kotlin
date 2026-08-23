@@ -27,14 +27,11 @@ import io.bazel.kotlin.builder.toolchain.CompilationTaskContext
 import io.bazel.kotlin.builder.toolchain.KotlinToolchain
 import io.bazel.kotlin.model.JvmCompilationTask
 import java.io.BufferedInputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.ObjectOutputStream
 import java.nio.file.Files.isDirectory
 import java.nio.file.Files.walk
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.Base64
 import java.util.stream.Collectors.toList
 import java.util.stream.Stream
 
@@ -45,8 +42,7 @@ fun JvmCompilationTask.codeGenArgs(): CompilationArgs =
   CompilationArgs()
     .absolutePaths(info.friendPathsList) {
       "-Xfriend-paths=${it.joinToString(X_FRIENDS_PATH_SEPARATOR)}"
-    }.flag("-d", directories.classes)
-    .values(info.passthroughFlagsList)
+    }.values(info.passthroughFlagsList)
 
 fun JvmCompilationTask.baseArgs(overrides: Map<String, String> = emptyMap()): CompilationArgs {
   val classpath =
@@ -65,7 +61,10 @@ fun JvmCompilationTask.baseArgs(overrides: Map<String, String> = emptyMap()): Co
         }
         inputs.directDependenciesList + transitiveDepsForCompile
       }
-      else -> inputs.classpathList
+
+      else -> {
+        inputs.classpathList
+      }
     } as List<String>
 
   return CompilationArgs()
@@ -82,108 +81,6 @@ fun JvmCompilationTask.baseArgs(overrides: Map<String, String> = emptyMap()): Co
       overrides[LANGUAGE_VERSION_ARG] ?: info.toolchainInfo.common.languageVersion,
     ).flag("-jvm-target", info.toolchainInfo.jvm.jvmTarget)
     .flag("-module-name", info.moduleName)
-}
-
-internal fun JvmCompilationTask.plugins(
-  options: List<String>,
-  classpath: List<String>,
-): CompilationArgs =
-  CompilationArgs().apply {
-    classpath.forEach {
-      xFlag("plugin", it)
-    }
-
-    val optionTokens =
-      mapOf(
-        "{generatedClasses}" to directories.generatedClasses,
-        "{stubs}" to directories.stubs,
-        "{temp}" to directories.temp,
-        "{generatedSources}" to directories.generatedSources,
-        "{classpath}" to classpath.joinToString(File.pathSeparator),
-      )
-    options.forEach { opt ->
-      val formatted =
-        optionTokens.entries.fold(opt) { formatting, (token, value) ->
-          formatting.replace(token, value)
-        }
-      flag("-P", "plugin:$formatted")
-    }
-  }
-
-internal fun encodeMap(options: Map<String, String>): String {
-  val os = ByteArrayOutputStream()
-  val oos = ObjectOutputStream(os)
-
-  oos.writeInt(options.size)
-  for ((key, value) in options.entries) {
-    oos.writeUTF(key)
-    oos.writeUTF(value)
-  }
-
-  oos.flush()
-  return Base64
-    .getEncoder()
-    .encodeToString(os.toByteArray())
-}
-
-internal fun JvmCompilationTask.kaptArgs(
-  context: CompilationTaskContext,
-  plugins: InternalCompilerPlugins,
-  aptMode: String,
-): CompilationArgs {
-  val javacArgs =
-    mapOf<String, String>(
-      "-target" to info.toolchainInfo.jvm.jvmTarget,
-      "-source" to info.toolchainInfo.jvm.jvmTarget,
-    )
-  return CompilationArgs().apply {
-    xFlag("plugin", plugins.kapt.jarPath)
-
-    val values =
-      arrayOf(
-        "sources" to listOf(directories.generatedJavaSources),
-        "classes" to listOf(directories.generatedClasses),
-        "stubs" to listOf(directories.stubs),
-        "incrementalData" to listOf(directories.incrementalData),
-        "javacArguments" to listOf(javacArgs.let(::encodeMap)),
-        "correctErrorTypes" to listOf("false"),
-        "verbose" to listOf(context.whenTracing { "true" } ?: "false"),
-        "apclasspath" to inputs.processorpathsList,
-        "aptMode" to listOf(aptMode),
-      )
-    val version =
-      info.toolchainInfo.common.apiVersion
-        .toFloat()
-
-    when {
-      version < 1.5 ->
-        base64Encode(
-          "-P",
-          *values + ("processors" to inputs.processorsList).asKeyToCommaList(),
-        ) { enc -> "plugin:${plugins.kapt.id}:configuration=$enc" }
-      else ->
-        repeatFlag(
-          "-P",
-          *values + ("processors" to inputs.processorsList),
-        ) { option, value ->
-          "plugin:${plugins.kapt.id}:$option=$value"
-        }
-    }
-    // Read kapt options from the plugin options
-    val optionPrefix = plugins.kapt.id + ":apoption="
-    val options =
-      (inputs.compilerPluginOptionsList + inputs.stubsPluginOptionsList)
-        .filter { o -> o.startsWith(optionPrefix) }
-        .map { o -> o.substring(optionPrefix.length).split(":", limit = 2) }
-        .map { kv -> kv[0] to listOf(kv[1]) }
-        .toTypedArray()
-
-    if (options.isNotEmpty()) {
-      base64Encode("-P", *options) { enc ->
-        "plugin:${plugins.kapt.id}:apoptions=$enc"
-      }
-    }
-  }
 }
 
 internal fun JvmCompilationTask.runPlugins(
@@ -215,6 +112,7 @@ private fun JvmCompilationTask.runKaptPlugin(
   compiler: KotlinToolchain.KotlincInvoker,
 ): JvmCompilationTask {
   return context.execute("kapt (${inputs.processorsList.joinToString(", ")})") {
+    val sources = (inputs.kotlinSourcesList + inputs.javaSourcesList).toTypedArray()
     baseArgs()
       .plus(
         plugins(
@@ -223,14 +121,12 @@ private fun JvmCompilationTask.runKaptPlugin(
         ),
       ).plus(
         kaptArgs(context, plugins, "stubsAndApt"),
-      ).flag("-d", directories.generatedClasses)
-      .values(inputs.kotlinSourcesList)
-      .values(inputs.javaSourcesList)
-      .list()
+      ).list()
       .let { args ->
         context.executeCompilerTask(
-          args,
-          compiler::compile,
+          { out ->
+            compiler.compile(args.toTypedArray(), sources, directories.generatedClasses, out)
+          },
           printOnSuccess = context.whenTracing { true } == true,
         )
       }.let { outputLines ->
@@ -257,23 +153,25 @@ fun JvmCompilationTask.compileKotlin(
     writeJdeps(outputs.jdeps, emptyJdeps(info.label))
     return emptyList()
   } else {
+    val sources = (inputs.javaSourcesList + inputs.kotlinSourcesList).toTypedArray()
     return (
       args +
         plugins(
           options = inputs.compilerPluginOptionsList,
           classpath = inputs.compilerPluginClasspathList,
         )
-    ).values(inputs.javaSourcesList)
-      .values(inputs.kotlinSourcesList)
-      .flag("-d", directories.classes)
-      .list()
+    ).list()
       .let {
         context.whenTracing {
           context.printLines("compileKotlin arguments:\n", it)
         }
         return@let context
-          .executeCompilerTask(it, compiler::compile, printOnFail = printOnFail)
-          .also {
+          .executeCompilerTask(
+            { out ->
+              compiler.compile(it.toTypedArray(), sources, directories.classes, out)
+            },
+            printOnFail = printOnFail,
+          ).also {
             context.whenTracing {
               printLines(
                 "kotlinc Files Created:",
@@ -295,10 +193,3 @@ fun JvmCompilationTask.compileKotlin(
       }
   }
 }
-
-/**
- * Helper function to convert a list of values into a single comma-separated string.
- * Used for KAPT plugin options in Kotlin versions < 1.5.
- */
-private fun Pair<String, List<String>>.asKeyToCommaList() =
-  first to listOf(second.joinToString(","))
