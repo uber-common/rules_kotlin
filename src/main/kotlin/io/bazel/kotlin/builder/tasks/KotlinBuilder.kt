@@ -53,10 +53,7 @@ class KotlinBuilder(
       SOURCE_JARS("--source_jars"),
       PROCESSOR_PATH("--processorpath"),
       PROCESSORS("--processors"),
-      STUBS_PLUGIN_OPTIONS("--stubs_plugin_options"),
-      STUBS_PLUGIN_CLASS_PATH("--stubs_plugin_classpath"),
-      COMPILER_PLUGIN_OPTIONS("--compiler_plugin_options"),
-      COMPILER_PLUGIN_CLASS_PATH("--compiler_plugin_classpath"),
+      PLUGINS_PAYLOAD("--plugins_payload"),
       OUTPUT("--output"),
       RULE_KIND("--rule_kind"),
       MODULE_NAME("--kotlin_module_name"),
@@ -271,19 +268,35 @@ class KotlinBuilder(
         addAllProcessors(argMap.optional(KotlinBuilderFlags.PROCESSORS) ?: emptyList())
         addAllProcessorpaths(argMap.optional(KotlinBuilderFlags.PROCESSOR_PATH) ?: emptyList())
 
-        addAllStubsPluginOptions(
-          argMap.optional(KotlinBuilderFlags.STUBS_PLUGIN_OPTIONS) ?: emptyList(),
-        )
-        addAllStubsPluginClasspath(
-          argMap.optional(KotlinBuilderFlags.STUBS_PLUGIN_CLASS_PATH) ?: emptyList(),
-        )
+        val plugins =
+          argMap
+            .optional(KotlinBuilderFlags.PLUGINS_PAYLOAD)
+            ?.singleOrNull()
+            ?.let(PluginsPayloadParser::parse)
+            ?: emptyList()
+        addAllPlugins(plugins)
 
-        addAllCompilerPluginOptions(
-          argMap.optional(KotlinBuilderFlags.COMPILER_PLUGIN_OPTIONS) ?: emptyList(),
-        )
-        addAllCompilerPluginClasspath(
-          argMap.optional(KotlinBuilderFlags.COMPILER_PLUGIN_CLASS_PATH) ?: emptyList(),
-        )
+        // Expand the structured plugins into the per-phase fields the compilation paths consume.
+        // The expansion reproduces the exact strings the legacy per-phase worker flags used to
+        // carry, so the -Xplugin/-P arguments handed to kotlinc are unchanged.
+        for (plugin in plugins) {
+          val optionStrings =
+            plugin.optionsList.map { option ->
+              if (option.value.isEmpty()) {
+                "${plugin.id}:${option.key}"
+              } else {
+                "${plugin.id}:${option.key}=${option.value}"
+              }
+            }
+          if (JvmCompilationTask.Inputs.PluginPhase.PLUGIN_PHASE_STUBS in plugin.phasesList) {
+            addAllStubsPluginClasspath(plugin.classpathList)
+            addAllStubsPluginOptions(optionStrings)
+          }
+          if (JvmCompilationTask.Inputs.PluginPhase.PLUGIN_PHASE_COMPILE in plugin.phasesList) {
+            addAllCompilerPluginClasspath(plugin.classpathList)
+            addAllCompilerPluginOptions(optionStrings)
+          }
+        }
 
         argMap
           .optional(KotlinBuilderFlags.SOURCES)

@@ -11,6 +11,33 @@ def fail_messages_in(target_subject):
 def flags_and_values_of(action_subject):
     return action_subject.argv().transform(desc = "parsed()", loop = _action_subject_parse_flags)
 
+def payload_plugins_of(action_subject):
+    """The --plugins_payload plugins, one normalized string per plugin."""
+    return action_subject.argv().transform(
+        desc = "plugins payload plugins",
+        loop = _action_subject_parse_payload_plugins,
+    )
+
+def _action_subject_parse_payload_plugins(argv):
+    if argv == None:
+        return []
+    payload = None
+    for i, arg in enumerate(argv):
+        if arg == "--plugins_payload" and i + 1 < len(argv):
+            payload = argv[i + 1]
+            break
+    if payload == None:
+        return []
+    return [
+        "id={id} classpath=[{classpath}] phases=[{phases}] options=[{options}]".format(
+            id = plugin["id"],
+            classpath = ",".join([entry.rsplit("/", 1)[-1] for entry in plugin["classpath"]]),
+            phases = ",".join(plugin["phases"]),
+            options = ",".join(["%s=%s" % (o["key"], o["value"]) for o in plugin["options"]]),
+        )
+        for plugin in json.decode(payload)["plugins"]
+    ]
+
 def _action_subject_parse_flags(argv):
     parsed_flags = {}
 

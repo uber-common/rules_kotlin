@@ -140,6 +140,30 @@ message JvmCompilationTask {
   }
 
   message Inputs {
+      enum PluginPhase {
+        PLUGIN_PHASE_UNSPECIFIED = 0;
+        PLUGIN_PHASE_COMPILE = 1;
+        PLUGIN_PHASE_STUBS = 2;
+      }
+
+      message PluginOption {
+        // Compiler plugin option key
+        string key = 1;
+        // Compiler plugin option value
+        string value = 2;
+      }
+
+      message Plugin {
+        // Kotlin compiler plugin id
+        string id = 1;
+        // Kotlin compiler plugin classpath
+        repeated string classpath = 2;
+        // Kotlin compiler plugin options
+        repeated PluginOption options = 3;
+        // Compilation phases where this plugin should be applied
+        repeated PluginPhase phases = 4;
+      }
+
       // The full classpath
       repeated string classpath = 1;
       // Direct dependencies of the target.
@@ -172,6 +196,8 @@ message JvmCompilationTask {
       repeated string javac_flags = 15;
       // JDeps dependency artifacts
       repeated string deps_artifacts = 16;
+      // Kotlin compiler plugins with explicit phase information.
+      repeated Plugin plugins = 17;
   }
 
   CompilationTaskInfo info = 1;

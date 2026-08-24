@@ -8,3 +8,8 @@ local_path_override(
 )
 
 bazel_dep(name = "bazel_features", version = "1.39.0")
+
+# The local toolchain declares path mapping support; without this registration the
+# rules_kotlin default toolchain (no path mapping) would win and the example would
+# silently build unmapped.
+register_toolchains("//:kotlin_toolchain")

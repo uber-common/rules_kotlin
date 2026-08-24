@@ -3,7 +3,15 @@ load("//kotlin:core.bzl", "kt_plugin_cfg")
 load("//kotlin:jvm.bzl", "kt_jvm_binary", "kt_jvm_import", "kt_jvm_library")
 load("//kotlin/compiler:kapt.bzl", "kapt_compiler_plugin")
 load("//src/test/starlark:case.bzl", "Want", "suite")
-load("//src/test/starlark:truth.bzl", "flags_and_values_of")
+load("//src/test/starlark:truth.bzl", "flags_and_values_of", "payload_plugins_of")
+
+# The per-phase plugin flags the plugins payload replaced; no action may carry them.
+_RETIRED_PLUGIN_FLAGS = [
+    "--compiler_plugin_classpath",
+    "--compiler_plugin_options",
+    "--stubs_plugin_classpath",
+    "--stubs_plugin_options",
+]
 
 def _normalize_path_with_cfg(file):
     """Attempts to normalize the file to standard configs.
@@ -56,7 +64,19 @@ def _action(env, got):
         for r in env.ctx.attr.runfiles
         for f in r[DefaultInfo].files.to_list()
     ])
-    flags_and_values_of(compile).contains_at_least(env.ctx.attr.flags.items())
+    parsed_flags = flags_and_values_of(compile)
+    parsed_flags.contains_at_least(env.ctx.attr.flags.items())
+    got_flag_keys = parsed_flags.transform(
+        desc = "flag keys",
+        map_each = lambda item: item[0],
+    )
+    flag_keys = getattr(env.ctx.attr, "flag_keys", [])
+    if flag_keys:
+        got_flag_keys.contains_at_least(flag_keys)
+    got_flag_keys.contains_none_of(_RETIRED_PLUGIN_FLAGS)
+    payload_plugins = getattr(env.ctx.attr, "payload_plugins", [])
+    if payload_plugins:
+        payload_plugins_of(compile).contains_exactly(payload_plugins)
 
 def _apoptions_to_kotlinc(rule_under_test, **kwargs):
     def test(test):
@@ -110,17 +130,29 @@ def _apoptions_to_kotlinc(rule_under_test, **kwargs):
                     attr = attr.label_list(allow_empty = True, allow_files = True, cfg = "exec"),
                     value = [dep_jar],
                 ),
+                "flag_keys": Want(
+                    attr = attr.string_list(),
+                    value = ["--plugins_payload"],
+                ),
                 "flags": Want(
                     attr = attr.string_list_dict(),
                     value = {
-                        "--stubs_plugin_options": [
-                            "org.jetbrains.kotlin.kapt3:apoption=%s:%s" % (option_key, option_value),
-                        ],
                     },
                 ),
                 "mnemonic": Want(
                     attr = attr.string(),
                     value = "KotlinKapt",
+                ),
+                "payload_plugins": Want(
+                    attr = attr.string_list(),
+                    value = [
+                        "id=org.jetbrains.kotlin.kapt3 " +
+                        "classpath=[processed_dagger-2.57.2.jar," +
+                        "processed_jakarta.inject-api-2.0.1.jar," +
+                        "processed_javax.inject-1.jar,processed_jspecify-1.0.0.jar," +
+                        "{}_dep.jar] ".format(test.name) +
+                        "phases=[PLUGIN_PHASE_STUBS] options=[apoption=hold:keep]",
+                    ],
                 ),
                 "runfiles": Want(
                     attr = attr.label_list(allow_empty = True, allow_files = True),

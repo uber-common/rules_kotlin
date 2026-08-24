@@ -59,6 +59,10 @@ load(
     "//kotlin/internal/utils:utils.bzl",
     _utils = "utils",
 )
+load(
+    "//src/main/starlark/core/plugin:payload.bzl",
+    _plugin_payload = "plugin_payload",
+)
 
 # UTILITY ##############################################################################################################
 def find_java_toolchain(ctx, target):
@@ -184,29 +188,13 @@ def _resource_path_relative_to_root(resource):
 
     return resource.path
 
-def _format_compile_plugin_options(o):
-    """Format compiler option into id:value for cmd line."""
-    return [
-        "%s:%s" % (o.id, o.value),
-    ]
-
 def _new_plugins_from(targets):
     """Returns a struct containing the plugin metadata for the given targets.
 
     Args:
         targets: A list of targets.
     Returns:
-        A struct containing the plugins for the given targets in the format:
-        {
-            stubs_phase = {
-                classpath = depset,
-                options= List[KtCompilerPluginOption],
-            ),
-            compile = {
-                classpath = depset,
-                options = List[KtCompilerPluginOption],
-            },
-        }
+        A struct containing merged plugins and aggregate classpath/data.
     """
 
     all_plugins = {}
@@ -223,7 +211,7 @@ def _new_plugins_from(targets):
         all_plugins[plugin.id] = plugin
 
     if plugins_without_phase:
-        fail("has plugin without a phase defined: %s" % cfgs_without_plugin)
+        fail("has plugin without a phase defined: %s" % plugins_without_phase)
 
     all_plugin_cfgs = {}
     cfgs_without_plugin = []
@@ -238,28 +226,36 @@ def _new_plugins_from(targets):
     if cfgs_without_plugin:
         fail("has plugin configurations without corresponding plugins: %s" % cfgs_without_plugin)
 
-    return struct(
-        stubs_phase = _new_plugin_from(all_plugin_cfgs, [p for p in all_plugins.values() if p.stubs]),
-        compile_phase = _new_plugin_from(all_plugin_cfgs, [p for p in all_plugins.values() if p.compile]),
-    )
-
-def _new_plugin_from(all_cfgs, plugins_for_phase):
     classpath = []
     data = []
-    options = []
-    for p in plugins_for_phase:
-        classpath.append(p.classpath)
-        options.extend(p.options)
-        if p.id in all_cfgs:
-            cfg = p.merge_cfgs(p, all_cfgs[p.id])
-            classpath.append(cfg.classpath)
+    plugins = []
+    for p in all_plugins.values():
+        plugin_classpath = [p.classpath]
+        plugin_options = list(p.options)
+        if p.id in all_plugin_cfgs:
+            cfg = p.merge_cfgs(p, all_plugin_cfgs[p.id])
+            plugin_classpath.append(cfg.classpath)
             data.append(cfg.data)
-            options.extend(cfg.options)
+            plugin_options.extend(cfg.options)
+
+        phases = []
+        if p.compile:
+            phases.append("compile")
+        if p.stubs:
+            phases.append("stubs")
+
+        plugins.append(struct(
+            id = p.id,
+            phases = phases,
+            classpath = depset(transitive = plugin_classpath),
+            options = plugin_options,
+        ))
+        classpath.extend(plugin_classpath)
 
     return struct(
         classpath = depset(transitive = classpath),
         data = depset(transitive = data),
-        options = options,
+        plugins = plugins,
     )
 
 # INTERNAL ACTIONS #####################################################################################################
@@ -558,6 +554,10 @@ def _run_ksp_builder_actions(
         ksp_generated_src_jar = ksp_generated_java_srcjar,
     )
 
+# payload: the single args.add_all item, a struct(plugins = ...) carrying the list of compiler plugins
+def _plugins_payload_to_json(payload):
+    return _plugin_payload.plugins_payload_json(payload.plugins)
+
 def _run_kt_builder_action(
         ctx,
         mnemonic,
@@ -617,30 +617,14 @@ def _run_kt_builder_action(
         uniquify = True,
     )
 
+    # Using 'args.add_all' with a map_each callback instead of 'args.add' allows the json payload
+    # to be computed lazily during command line expansion, when the PathMapper, if any, is
+    # installed (e.g. with --experimental_output_paths=strip). This ensures the computed payload
+    # contains correctly mapped paths.
     args.add_all(
-        "--stubs_plugin_classpath",
-        plugins.stubs_phase.classpath,
-        omit_if_empty = True,
-    )
-
-    args.add_all(
-        "--stubs_plugin_options",
-        plugins.stubs_phase.options,
-        map_each = _format_compile_plugin_options,
-        omit_if_empty = True,
-    )
-
-    args.add_all(
-        "--compiler_plugin_classpath",
-        plugins.compile_phase.classpath,
-        omit_if_empty = True,
-    )
-
-    args.add_all(
-        "--compiler_plugin_options",
-        plugins.compile_phase.options,
-        map_each = _format_compile_plugin_options,
-        omit_if_empty = True,
+        "--plugins_payload",
+        [struct(plugins = plugins.plugins)],
+        map_each = _plugins_payload_to_json,
     )
 
     if not "kt_remove_private_classes_in_abi_plugin_incompatible" in ctx.attr.tags and toolchains.kt.experimental_remove_private_classes_in_abi_jars == True:
@@ -679,8 +663,7 @@ def _run_kt_builder_action(
                 compile_deps.compile_jars,
                 transitive_runtime_jars,
                 deps_artifacts,
-                plugins.stubs_phase.classpath,
-                plugins.compile_phase.classpath,
+                plugins.classpath,
             ],
         ),
         tools = [

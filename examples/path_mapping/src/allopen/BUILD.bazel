@@ -1,0 +1,51 @@
+load("@rules_java//java:defs.bzl", "java_import")
+load("@rules_kotlin//kotlin:core.bzl", "kt_compiler_plugin")
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+
+# Copy the allopen jar out of the external repository so the plugin classpath entry is a
+# derived artifact under bazel-out: path mapping only rewrites derived paths, so a source
+# jar served straight from the external repository could never detect a plugins payload
+# that bakes unmapped paths.
+genrule(
+    name = "allopen_compiler_plugin_jar",
+    srcs = ["@rules_kotlin//kotlin/compiler:allopen-compiler-plugin"],
+    outs = ["allopen-compiler-plugin.jar"],
+    cmd = "cp $< $@",
+)
+
+java_import(
+    name = "allopen_derived",
+    jars = [":allopen_compiler_plugin_jar"],
+)
+
+kt_compiler_plugin(
+    name = "open_for_testing_plugin",
+    compile_phase = True,
+    id = "org.jetbrains.kotlin.allopen",
+    options = {
+        "annotation": "pathmapping.allopen.OpenForTesting",
+    },
+    stubs_phase = True,
+    deps = [":allopen_derived"],
+)
+
+kt_jvm_library(
+    name = "open_for_testing",
+    srcs = ["OpenForTesting.kt"],
+)
+
+kt_jvm_library(
+    name = "user",
+    srcs = ["User.kt"],
+    plugins = [":open_for_testing_plugin"],
+    deps = [":open_for_testing"],
+)
+
+# Compiles only if the allopen plugin actually ran while compiling :user - without it,
+# User is final and subclassing fails. With path mapping engaged, a successful build
+# proves the worker loaded the plugin from the mapped classpath the payload carries.
+kt_jvm_library(
+    name = "user_is_open",
+    srcs = ["UserIsOpen.kt"],
+    deps = [":user"],
+)
