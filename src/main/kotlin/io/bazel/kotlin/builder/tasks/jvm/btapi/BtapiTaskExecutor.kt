@@ -18,7 +18,6 @@ package io.bazel.kotlin.builder.tasks.jvm.btapi
 
 import com.google.devtools.build.lib.view.proto.Deps
 import io.bazel.kotlin.builder.tasks.JvmTaskExecutor
-import io.bazel.kotlin.builder.tasks.jvm.CompilationArgs
 import io.bazel.kotlin.builder.tasks.jvm.InternalCompilerPlugins
 import io.bazel.kotlin.builder.tasks.jvm.JDepsGenerator.emptyJdeps
 import io.bazel.kotlin.builder.tasks.jvm.JDepsGenerator.writeJdeps
@@ -30,16 +29,20 @@ import io.bazel.kotlin.builder.tasks.jvm.createGeneratedKspKotlinSrcJar
 import io.bazel.kotlin.builder.tasks.jvm.createGeneratedStubJar
 import io.bazel.kotlin.builder.tasks.jvm.createOutputJar
 import io.bazel.kotlin.builder.tasks.jvm.createdGeneratedKspClassesJar
+import io.bazel.kotlin.builder.tasks.jvm.encodeMap
 import io.bazel.kotlin.builder.tasks.jvm.expandWithGeneratedSources
-import io.bazel.kotlin.builder.tasks.jvm.kaptArgs
-import io.bazel.kotlin.builder.tasks.jvm.plugins
+import io.bazel.kotlin.builder.tasks.jvm.incrementalData
 import io.bazel.kotlin.builder.tasks.jvm.preProcessingSteps
+import io.bazel.kotlin.builder.tasks.jvm.stubs
 import io.bazel.kotlin.builder.toolchain.CompilationStatusException
 import io.bazel.kotlin.builder.toolchain.CompilationTaskContext
 import io.bazel.kotlin.compiler.CompilationUnit
 import io.bazel.kotlin.compiler.CompilerConfiguration
+import io.bazel.kotlin.compiler.CompilerPluginSpec
 import io.bazel.kotlin.model.JvmCompilationTask
+import io.bazel.kotlin.model.JvmCompilationTask.Inputs.PluginPhase
 import java.io.BufferedInputStream
+import java.io.File
 import java.io.PrintStream
 import java.nio.file.Paths
 
@@ -50,6 +53,13 @@ class BtapiTaskExecutor(
   private val invoker: BtapiInvoker,
   private val plugins: InternalCompilerPlugins,
 ) : JvmTaskExecutor {
+  private data class PluginDescriptor(
+    override val id: String,
+    override val classpath: List<String>,
+    /** Each option is a `key=value` string; option keys cannot contain `=`. */
+    override val options: List<String>,
+  ) : CompilerPluginSpec
+
   override fun execute(
     context: CompilationTaskContext,
     task: JvmCompilationTask,
@@ -126,15 +136,24 @@ class BtapiTaskExecutor(
       return this
     }
     return context.execute("kapt (${inputs.processorsList.joinToString(", ")})") {
-      val arguments =
-        plugins(
-          options = inputs.stubsPluginOptionsList.filterNot { o -> o.startsWith(plugins.kapt.id) },
-          classpath = inputs.stubsPluginClasspathList,
-        ).append(kaptArgs(context, plugins, "stubsAndApt"))
-          .list()
+      val descriptors =
+        listOf(kaptPluginDescriptor(context)) +
+          userPluginDescriptors(PluginPhase.PLUGIN_PHASE_STUBS)
       context
         .executeCompilerTask(
-          { out -> invokeCompiler(context, arguments, directories.generatedClasses, out) },
+          { out ->
+            // Like the legacy pre-pass, this compiles with the toolchain's base arguments only:
+            // the user's pass-through flags and the friend paths belong to the main compile.
+            invokeCompiler(
+              context,
+              arguments = emptyList(),
+              friendPaths = emptyList(),
+              sources = inputs.kotlinSourcesList + inputs.javaSourcesList,
+              descriptors = descriptors,
+              destination = directories.generatedClasses,
+              out = out,
+            )
+          },
           printOnSuccess = context.whenTracing { true } == true,
         ).let { outputLines ->
           context.whenTracing {
@@ -146,57 +165,78 @@ class BtapiTaskExecutor(
   }
 
   private fun JvmCompilationTask.runKotlinCompiler(context: CompilationTaskContext): List<String> {
-    val arguments =
-      CompilationArgs()
-        .given(outputs.jdeps)
-        .notEmpty {
-          plugin(plugins.jdeps) {
-            flag("output", outputs.jdeps)
-            flag("target_label", info.label)
-            inputs.directDependenciesList.forEach {
-              flag("direct_dependencies", it)
-            }
-            inputs.classpathList.forEach {
-              flag("full_classpath", it)
-            }
-            flag("strict_kotlin_deps", info.strictKotlinDeps)
-          }
-        }.given(outputs.abijar)
-        .notEmpty {
-          plugin(plugins.jvmAbiGen) {
-            flag("outputDir", directories.abiClasses)
-            if (info.treatInternalAsPrivateInAbiJar) {
-              flag("treatInternalAsPrivate", "true")
-            }
-            if (info.removePrivateClassesInAbiJar) {
-              flag("removePrivateClasses", "true")
-            }
-            if (info.removeDebugInfo) {
-              flag("removeDebugInfo", "true")
-            }
-            if (info.preserveDeclarationOrder) {
-              flag("preserveDeclarationOrder", "true")
-            }
-            if (info.removeDataClassCopyIfConstructorIsPrivate) {
-              flag("removeDataClassCopyIfConstructorIsPrivate", "true")
-            }
-          }
-          given(outputs.jar).empty {
-            plugin(plugins.skipCodeGen)
-          }
-        }.values(info.passthroughFlagsList)
-        .append(
-          plugins(
-            options = inputs.compilerPluginOptionsList,
-            classpath = inputs.compilerPluginClasspathList,
+    val descriptors = mutableListOf<PluginDescriptor>()
+
+    if (outputs.jdeps.isNotEmpty()) {
+      descriptors.add(
+        PluginDescriptor(
+          id = plugins.jdeps.id,
+          classpath = listOf(plugins.jdeps.jarPath),
+          options =
+            listOf(
+              "output=${outputs.jdeps}",
+              "target_label=${info.label}",
+            ) +
+              inputs.directDependenciesList.map { "direct_dependencies=$it" } +
+              inputs.classpathList.map { "full_classpath=$it" } +
+              listOf("strict_kotlin_deps=${info.strictKotlinDeps}"),
+        ),
+      )
+    }
+    if (outputs.abijar.isNotEmpty()) {
+      val abiOptions = mutableListOf("outputDir=${directories.abiClasses}")
+      if (info.treatInternalAsPrivateInAbiJar) {
+        abiOptions.add("treatInternalAsPrivate=true")
+      }
+      if (info.removePrivateClassesInAbiJar) {
+        abiOptions.add("removePrivateClasses=true")
+      }
+      if (info.removeDebugInfo) {
+        abiOptions.add("removeDebugInfo=true")
+      }
+      if (info.preserveDeclarationOrder) {
+        abiOptions.add("preserveDeclarationOrder=true")
+      }
+      if (info.removeDataClassCopyIfConstructorIsPrivate) {
+        abiOptions.add("removeDataClassCopyIfConstructorIsPrivate=true")
+      }
+      descriptors.add(
+        PluginDescriptor(
+          id = plugins.jvmAbiGen.id,
+          classpath = listOf(plugins.jvmAbiGen.jarPath),
+          options = abiOptions,
+        ),
+      )
+      if (outputs.jar.isEmpty()) {
+        descriptors.add(
+          PluginDescriptor(
+            id = plugins.skipCodeGen.id,
+            classpath = listOf(plugins.skipCodeGen.jarPath),
+            options = emptyList(),
           ),
-        ).list()
+        )
+      }
+    }
+    descriptors.addAll(userPluginDescriptors(PluginPhase.PLUGIN_PHASE_COMPILE))
 
     context.whenTracing {
-      context.printLines("Kotlin Compiler arguments:\n", arguments)
+      context.printLines(
+        "Kotlin Compiler plugins:\n",
+        descriptors.map { "${it.id} ${it.options}" },
+      )
     }
     return context.executeCompilerTask(
-      { out -> invokeCompiler(context, arguments, directories.classes, out) },
+      { out ->
+        invokeCompiler(
+          context,
+          arguments = info.passthroughFlagsList,
+          friendPaths = info.friendPathsList,
+          sources = inputs.javaSourcesList + inputs.kotlinSourcesList,
+          descriptors = descriptors,
+          destination = directories.classes,
+          out = out,
+        )
+      },
       printOnFail = false,
     )
   }
@@ -217,9 +257,90 @@ class BtapiTaskExecutor(
     override val verbose: Boolean,
   ) : CompilerConfiguration
 
+  /**
+   * The user's structured plugins for one phase, excluding kapt (which the pre-pass configures itself).
+   */
+  private fun JvmCompilationTask.userPluginDescriptors(phase: PluginPhase): List<PluginDescriptor> =
+    inputs.pluginsList
+      .filter { phase in it.phasesList && it.id != plugins.kapt.id }
+      .map { plugin ->
+        val tokens =
+          mapOf(
+            "{generatedClasses}" to directories.generatedClasses,
+            "{stubs}" to directories.stubs,
+            "{temp}" to directories.temp,
+            "{generatedSources}" to directories.generatedSources,
+            "{classpath}" to plugin.classpathList.joinToString(File.pathSeparator),
+          )
+        PluginDescriptor(
+          id = plugin.id,
+          classpath = plugin.classpathList,
+          options =
+            plugin.optionsList.map { option ->
+              val value =
+                tokens.entries.fold(option.value) { formatting, (token, tokenValue) ->
+                  formatting.replace(token, tokenValue)
+                }
+              if (value.isEmpty()) option.key else "${option.key}=$value"
+            },
+        )
+      }
+
+  /**
+   * The kapt plugin configured as a typed descriptor: the stubs-and-apt pre-pass directories,
+   * the javac arguments (both spelling variants, see the legacy kaptArgs contract), the
+   * processors and their classpath, and the user's kapt apOptions decoded from the structured
+   * plugin options.
+   */
+  private fun JvmCompilationTask.kaptPluginDescriptor(
+    context: CompilationTaskContext,
+  ): PluginDescriptor {
+    val jvmTarget = info.toolchainInfo.jvm.jvmTarget
+    val javacArgs =
+      mapOf(
+        "-target" to jvmTarget,
+        "--target" to jvmTarget,
+        "-source" to jvmTarget,
+        "--source" to jvmTarget,
+      )
+    val options = mutableListOf<String>()
+    options.add("sources=${directories.generatedJavaSources}")
+    options.add("classes=${directories.generatedClasses}")
+    options.add("stubs=${directories.stubs}")
+    options.add("incrementalData=${directories.incrementalData}")
+    options.add("javacArguments=${encodeMap(javacArgs)}")
+    options.add("correctErrorTypes=false")
+    options.add("verbose=${context.whenTracing { "true" } ?: "false"}")
+    options.add("aptMode=stubsAndApt")
+    inputs.processorpathsList.forEach { options.add("apclasspath=$it") }
+    inputs.processorsList.forEach { options.add("processors=$it") }
+
+    val apOptions =
+      inputs.pluginsList
+        .asSequence()
+        .filter { it.id == plugins.kapt.id }
+        .flatMap { it.optionsList.asSequence() }
+        .filter { it.key == "apoption" }
+        .map { option ->
+          option.value.split(":", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+        }.toMap()
+    if (apOptions.isNotEmpty()) {
+      options.add("apoptions=${encodeMap(apOptions)}")
+    }
+
+    return PluginDescriptor(
+      id = plugins.kapt.id,
+      classpath = listOf(plugins.kapt.jarPath),
+      options = options,
+    )
+  }
+
   private fun JvmCompilationTask.invokeCompiler(
     context: CompilationTaskContext,
     arguments: List<String>,
+    friendPaths: List<String>,
+    sources: List<String>,
+    descriptors: List<PluginDescriptor>,
     destination: String,
     out: PrintStream,
   ): Int =
@@ -227,9 +348,9 @@ class BtapiTaskExecutor(
       errStream = out,
       compilationUnit =
         TaskCompilationUnit(
-          sources = inputs.javaSourcesList + inputs.kotlinSourcesList,
+          sources = sources,
           classpath = computeClasspath() + directories.generatedClasses,
-          friendPaths = info.friendPathsList,
+          friendPaths = friendPaths,
           destination = destination,
         ),
       configuration =
@@ -241,6 +362,7 @@ class BtapiTaskExecutor(
           passthroughArguments = arguments,
           verbose = context.whenTracing { true } == true,
         ),
+      plugins = descriptors,
     )
 
   /**

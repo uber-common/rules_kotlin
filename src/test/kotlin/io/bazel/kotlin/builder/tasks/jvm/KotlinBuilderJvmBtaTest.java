@@ -15,13 +15,19 @@
  */
 package io.bazel.kotlin.builder.tasks.jvm;
 
+import io.bazel.kotlin.builder.Deps.AnnotationProcessor;
+import io.bazel.kotlin.builder.Deps.Dep;
 import io.bazel.kotlin.builder.DirectoryType;
 import io.bazel.kotlin.builder.KotlinJvmTestBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+import java.util.stream.Collectors;
+
 import static com.google.common.truth.Truth.assertThat;
+import static io.bazel.kotlin.builder.KotlinJvmTestBuilder.KOTLIN_ANNOTATIONS;
+import static io.bazel.kotlin.builder.KotlinJvmTestBuilder.KOTLIN_STDLIB;
 
 /** Compiles through the Build Tools API path ({@code --build_tools_api=true}). */
 @RunWith(JUnit4.class)
@@ -141,6 +147,55 @@ public class KotlinBuilderJvmBtaTest {
                     c.outputJdeps();
                 });
         assertThat(ctx.classFileMajorVersion("something/AClass.class")).isEqualTo(61);
+    }
+
+    @Test
+    public void testKaptRunsThroughTypedPluginConfig() {
+        // On the Build Tools API path the KAPT stubs-and-apt pre-pass is configured as a typed
+        // plugin descriptor (no base64 -P configuration blob); the annotation processor must
+        // still run and generate sources that are compiled into the output.
+        Dep autoValueAnnotations = Dep.fromLabel("auto_value_annotations");
+        Dep autoValue = Dep.fromLabel("auto_value");
+        AnnotationProcessor autoValueProcessor =
+                AnnotationProcessor.builder()
+                        .processClass("com.google.auto.value.processor.AutoValueProcessor")
+                        .processorPath(
+                                Dep.classpathOf(autoValueAnnotations, autoValue, KOTLIN_ANNOTATIONS)
+                                        .collect(Collectors.toSet()))
+                        .build();
+
+        ctx.runCompileTask(
+                c -> {
+                    c.useBuildToolsApi();
+                    c.compileKotlin();
+                    c.addAnnotationProcessors(autoValueProcessor);
+                    c.addDirectDependencies(autoValueAnnotations, KOTLIN_ANNOTATIONS, KOTLIN_STDLIB);
+                    c.addSource(
+                            "TestKtValue.kt",
+                            "package autovalue\n"
+                                    + "\n"
+                                    + "import com.google.auto.value.AutoValue\n"
+                                    + "\n"
+                                    + "@AutoValue\n"
+                                    + "abstract class TestKtValue {\n"
+                                    + "    abstract fun name(): String\n"
+                                    + "    fun builder(): Builder = AutoValue_TestKtValue.Builder()\n"
+                                    + "\n"
+                                    + "    @AutoValue.Builder\n"
+                                    + "    abstract class Builder {\n"
+                                    + "        abstract fun setName(name: String): Builder\n"
+                                    + "        abstract fun build(): TestKtValue\n"
+                                    + "    }\n"
+                                    + "}");
+                    c.outputJar();
+                    c.outputJdeps();
+                    c.generatedSourceJar();
+                    c.ktStubsJar();
+                    c.incrementalData();
+                });
+
+        ctx.assertFilesExist(DirectoryType.JAVA_SOURCE_GEN, "autovalue/AutoValue_TestKtValue.java");
+        ctx.assertFilesExist(DirectoryType.CLASSES, "autovalue/TestKtValue.class");
     }
 
     @Test

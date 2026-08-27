@@ -19,6 +19,7 @@ package io.bazel.kotlin.builder.tasks.jvm.btapi
 import io.bazel.kotlin.builder.toolchain.KotlinToolchain
 import io.bazel.kotlin.compiler.CompilationUnit
 import io.bazel.kotlin.compiler.CompilerConfiguration
+import io.bazel.kotlin.compiler.CompilerPluginSpec
 import io.bazel.kotlin.compiler.KotlinBtapiCompiler
 import java.io.PrintStream
 import java.lang.invoke.MethodHandle
@@ -38,6 +39,7 @@ class BtapiInvoker(
   private val execHandle: MethodHandle
   private val compilationUnitDispatcher = Dispatcher(CompilationUnit::class.java)
   private val configurationDispatcher = Dispatcher(CompilerConfiguration::class.java)
+  private val pluginDispatcher = Dispatcher(CompilerPluginSpec::class.java)
 
   init {
     val compilerClass = btapiClassLoader.loadClass("io.bazel.kotlin.compiler.BuildToolsAPICompiler")
@@ -64,12 +66,14 @@ class BtapiInvoker(
     errStream: PrintStream,
     compilationUnit: CompilationUnit,
     configuration: CompilerConfiguration,
+    plugins: List<CompilerPluginSpec>,
   ): Int =
     execHandle.invoke(
       compilerImpl,
       errStream,
       compilationUnitDispatcher.applyTo(compilationUnit),
       configurationDispatcher.applyTo(configuration),
+      plugins.map(pluginDispatcher::applyTo),
     ) as Int
 
   /**

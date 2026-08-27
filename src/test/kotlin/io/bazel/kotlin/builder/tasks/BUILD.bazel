@@ -61,6 +61,15 @@ kt_rules_test(
 )
 
 kt_rules_test(
+    name = "KotlinBuilderJvmBtaTest",
+    srcs = ["jvm/KotlinBuilderJvmBtaTest.java"],
+    data = [
+        "auto_value",
+        "auto_value_annotations",
+    ],
+)
+
+kt_rules_test(
     name = "KotlinBuilderJvmJdepsTest",
     size = "large",
     srcs = ["jvm/KotlinBuilderJvmJdepsTest.kt"],

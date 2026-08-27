@@ -37,6 +37,13 @@ interface CompilerConfiguration {
   val verbose: Boolean
 }
 
+/** One configured compiler plugin; each option is a `key=value` string. */
+interface CompilerPluginSpec {
+  val id: String
+  val classpath: List<String>
+  val options: List<String>
+}
+
 /**
  * The typed Build Tools API compilation contract between the worker and the compiler classloader.
  * Provides structured API to invoke compiler as an in-process utility.
@@ -46,5 +53,6 @@ interface KotlinBtapiCompiler {
     errStream: PrintStream,
     compilationUnit: CompilationUnit,
     configuration: CompilerConfiguration,
+    plugins: List<CompilerPluginSpec>,
   ): Int
 }

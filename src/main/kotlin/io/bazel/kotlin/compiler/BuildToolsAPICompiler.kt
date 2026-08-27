@@ -21,6 +21,8 @@ import org.jetbrains.kotlin.buildtools.api.KotlinLogger
 import org.jetbrains.kotlin.buildtools.api.KotlinToolchains
 import org.jetbrains.kotlin.buildtools.api.SharedApiClassesClassLoader
 import org.jetbrains.kotlin.buildtools.api.arguments.CommonCompilerArguments
+import org.jetbrains.kotlin.buildtools.api.arguments.CompilerPlugin
+import org.jetbrains.kotlin.buildtools.api.arguments.CompilerPluginOption
 import org.jetbrains.kotlin.buildtools.api.arguments.ExperimentalCompilerArgument
 import org.jetbrains.kotlin.buildtools.api.arguments.JvmCompilerArguments
 import org.jetbrains.kotlin.buildtools.api.arguments.enums.JdkRelease
@@ -88,6 +90,7 @@ class BuildToolsAPICompiler(
     errStream: PrintStream,
     compilationUnit: CompilationUnit,
     configuration: CompilerConfiguration,
+    plugins: List<CompilerPluginSpec>,
   ): Int {
     System.setProperty("zip.handler.uses.crc.instead.of.timestamp", "true")
 
@@ -101,11 +104,29 @@ class BuildToolsAPICompiler(
 
     val args = operationBuilder.compilerArguments
 
-    // 1. User pass-through flags and compiler plugin arguments (resets the builder; must be first).
+    // 1. User pass-through flags (resets the builder; must be first).
     val passthroughArguments = configuration.passthroughArguments
     if (passthroughArguments.isNotEmpty()) {
       args.applyArgumentStrings(passthroughArguments)
     }
+
+    if (plugins.isNotEmpty()) {
+      args[CommonCompilerArguments.COMPILER_PLUGINS] =
+        plugins.map { plugin ->
+          CompilerPlugin(
+            pluginId = plugin.id,
+            classpath = plugin.classpath.map { Paths.get(it) },
+            rawArguments =
+              plugin.options.map { option ->
+                CompilerPluginOption(option.substringBefore('='), option.substringAfter('=', ""))
+              },
+            orderingRequirements = emptySet(),
+          )
+        }
+    }
+
+    // The default scripting plugin must be 'off' on every compilation. Only .kt and .java sources are compiled.
+    args[CommonCompilerArguments.X_DISABLE_DEFAULT_SCRIPTING_PLUGIN] = true
 
     // 2. Toolchain defaults -- only for options the user did not set, so user flags win.
     var effectiveJvmTarget = args[JvmCompilerArguments.JVM_TARGET]
