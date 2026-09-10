@@ -35,11 +35,9 @@ def _jvm_deps(ctx, toolchains, associate_deps, deps = [], deps_java_infos = [], 
         [toolchains.kt.jvm_stdlibs]
     )
 
-    prune_transitive_deps = (toolchains.kt.experimental_prune_transitive_deps and
-                             not "kt_experimental_prune_transitive_deps_incompatible" in ctx.attr.tags)
-
     # Reduced classpath, exclude transitive deps from compilation
-    if prune_transitive_deps:
+    if (toolchains.kt.experimental_prune_transitive_deps and
+        not "kt_experimental_prune_transitive_deps_incompatible" in ctx.attr.tags):
         transitive_jars = []
         repositories_to_keep = toolchains.kt.experimental_prune_transitive_deps_keep_transitive_repositories
         if repositories_to_keep:
@@ -75,19 +73,9 @@ def _jvm_deps(ctx, toolchains, associate_deps, deps = [], deps_java_infos = [], 
     ).to_list()
     compile_depset_list_filtered = [jar for jar in compile_depset_list if not _sets.contains(associates.abi_jar_set, jar)]
 
-    # The deps the Java half compiles against
-    if prune_transitive_deps:
-        java_deps = [
-            JavaInfo(output_jar = jar, compile_jar = jar, deps = [], neverlink = True)
-            for jar in compile_depset_list_filtered
-        ]
-    else:
-        java_deps = dep_infos
-
     return struct(
         module_name = associates.module_name,
         deps = dep_infos,
-        java_deps = java_deps,
         exports = [_java_info(d) for d in exports],
         associate_jars = associates.jars,
         compile_jars = depset(direct = compile_depset_list_filtered),

@@ -195,57 +195,6 @@ def _test_classpath_experimental_prune_transitive_deps_prune_unmatched_maven_rep
         },
     )
 
-def _javac_inputs_assertions_(env, target):
-    # javac reads its arguments from a params file, so action.argv cannot be parsed for
-    # --classpath the way the worker's flagfile can. The action inputs are an equivalent
-    # assertion surface: a jar absent from the inputs cannot be on the compile classpath.
-    action = env.expect.that_target(target).action_named("Javac")
-
-    want_input_matchers = [
-        matching.file_basename_equals(abi_jar_of(f.basename))
-        for f in env.ctx.files.want_inputs
-        if not f.basename.endswith("jdeps")
-    ]
-    action.inputs().contains_at_least_predicates(want_input_matchers)
-
-    for f in env.ctx.files.not_want_inputs:
-        if not f.basename.endswith("jdeps"):
-            action.inputs().not_contains_predicate(matching.file_basename_equals(f.basename))
-
-def _make_javac_classpath_test(setting_value, not_want_transitive):
-    """The javac half of a mixed kt/java target must compile against the same (pruned or full)
-    classpath as the Kotlin half."""
-
-    def _case(test):
-        (dependency_a_trans_dep_jar, dependency_a, main_target_library) = arrange(
-            test,
-            with_java_main = True,
-        )
-
-        analysis_test(
-            name = test.name,
-            impl = _javac_inputs_assertions_,
-            target = main_target_library,
-            config_settings = {
-                str(Label("@rules_kotlin//kotlin/settings:experimental_prune_transitive_deps")): setting_value,
-                str(Label("@rules_kotlin//kotlin/settings:experimental_prune_transitive_deps_keep_transitive_repositories")): [],
-                str(Label("@rules_kotlin//kotlin/settings:experimental_strict_associate_dependencies")): False,
-            },
-            attr_values = {
-                "not_want_inputs": [dependency_a_trans_dep_jar] if not_want_transitive else [],
-                "want_inputs": [dependency_a] if not_want_transitive else [
-                    dependency_a,
-                    dependency_a_trans_dep_jar,
-                ],
-            },
-            attrs = {
-                "not_want_inputs": attr.label_list(providers = [DefaultInfo], allow_files = True),
-                "want_inputs": attr.label_list(providers = [DefaultInfo], allow_files = True),
-            },
-        )
-
-    return _case
-
 def experimental_prune_transitive_deps_tests(name):
     suite(
         name,
@@ -253,6 +202,4 @@ def experimental_prune_transitive_deps_tests(name):
         enabled_keep_maven_repository = _test_classpath_experimental_prune_transitive_deps_keep_maven_repository,
         enabled_prune_unmatched_maven_repository = _test_classpath_experimental_prune_transitive_deps_prune_unmatched_maven_repository,
         disabled = _test_classpath_experimental_prune_transitive_deps_False,
-        javac_enabled = _make_javac_classpath_test(True, True),
-        javac_disabled = _make_javac_classpath_test(False, False),
     )
