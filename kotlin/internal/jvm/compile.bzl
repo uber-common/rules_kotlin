@@ -1046,9 +1046,9 @@ def _run_kt_java_builder_actions(
 
         compile_jars.append(kt_compile_jar)
         output_jars.append(kt_runtime_jar)
-        # Always compile the Java half against the full Kotlin output. Kaptish still needs this
-        # JavaInfo for annotation processors to inspect the target's complete Kotlin ABI.
-        kt_stubs_for_java.append(JavaInfo(compile_jar = kt_runtime_jar, output_jar = kt_runtime_jar, neverlink = True))
+        # Always expose the Kotlin ABI jar to the Java compilation so javac can resolve
+        # Kotlin symbols, including when annotation processors are present.
+        kt_stubs_for_java.append(JavaInfo(compile_jar = kt_compile_jar, output_jar = kt_runtime_jar, neverlink = True))
 
         kt_java_info = JavaInfo(
             output_jar = kt_runtime_jar,
