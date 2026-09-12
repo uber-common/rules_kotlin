@@ -296,6 +296,42 @@ Lint Kotlin files, and fail if the linter raises errors.
 
 
 
+<a id="kt_btapi_runtime"></a>
+
+## kt_btapi_runtime
+
+<pre>
+load("@rules_kotlin//kotlin:core.bzl", "kt_btapi_runtime")
+
+kt_btapi_runtime(<a href="#kt_btapi_runtime-name">name</a>, <a href="#kt_btapi_runtime-base">base</a>, <a href="#kt_btapi_runtime-build_tools_impl">build_tools_impl</a>, <a href="#kt_btapi_runtime-compiler">compiler</a>, <a href="#kt_btapi_runtime-jdeps_gen">jdeps_gen</a>, <a href="#kt_btapi_runtime-jvm_abi_gen">jvm_abi_gen</a>, <a href="#kt_btapi_runtime-kapt">kapt</a>, <a href="#kt_btapi_runtime-libraries">libraries</a>,
+                 <a href="#kt_btapi_runtime-skip_code_gen">skip_code_gen</a>)
+</pre>
+
+The Build Tools API compilation runtime: the jars the worker loads into the Build Tools
+API classloader, and the internal compiler plugins it passes to the compiler. Every jar is the
+embeddable compiler dialect (the Maven-published form of the compiler and its plugins), because
+the Build Tools implementation is published in that dialect only.
+
+An artifact that is not set is inherited from `base`, so a runtime that replaces one artifact
+states only that artifact. The default runtime, `//kotlin/compiler:btapi_runtime`, takes every
+artifact from the configured Kotlin release.
+
+**ATTRIBUTES**
+
+
+| Name  | Description | Type | Mandatory | Default |
+| :------------- | :------------- | :------------- | :------------- | :------------- |
+| <a id="kt_btapi_runtime-name"></a>name |  A unique name for this target.   | <a href="https://bazel.build/concepts/labels#target-names">Name</a> | required |  |
+| <a id="kt_btapi_runtime-base"></a>base |  The runtime that provides every artifact this target does not set.   | <a href="https://bazel.build/concepts/labels">Label</a> | optional |  `None`  |
+| <a id="kt_btapi_runtime-build_tools_impl"></a>build_tools_impl |  The Build Tools implementation.   | <a href="https://bazel.build/concepts/labels">List of labels</a> | optional |  `[]`  |
+| <a id="kt_btapi_runtime-compiler"></a>compiler |  The compiler, embeddable dialect.   | <a href="https://bazel.build/concepts/labels">List of labels</a> | optional |  `[]`  |
+| <a id="kt_btapi_runtime-jdeps_gen"></a>jdeps_gen |  The jdeps-gen compiler plugin, embeddable dialect.   | <a href="https://bazel.build/concepts/labels">List of labels</a> | optional |  `[]`  |
+| <a id="kt_btapi_runtime-jvm_abi_gen"></a>jvm_abi_gen |  The jvm-abi-gen compiler plugin, embeddable dialect.   | <a href="https://bazel.build/concepts/labels">List of labels</a> | optional |  `[]`  |
+| <a id="kt_btapi_runtime-kapt"></a>kapt |  The kapt compiler plugin, embeddable dialect.   | <a href="https://bazel.build/concepts/labels">List of labels</a> | optional |  `[]`  |
+| <a id="kt_btapi_runtime-libraries"></a>libraries |  The libraries the implementation and the compiler need.   | <a href="https://bazel.build/concepts/labels">List of labels</a> | optional |  `[]`  |
+| <a id="kt_btapi_runtime-skip_code_gen"></a>skip_code_gen |  The skip-code-gen compiler plugin, embeddable dialect.   | <a href="https://bazel.build/concepts/labels">List of labels</a> | optional |  `[]`  |
+
+
 <a id="kt_compiler_plugin"></a>
 
 ## kt_compiler_plugin
@@ -351,7 +387,7 @@ kt_jvm_library(
 | <a id="kt_compiler_plugin-id"></a>id |  The ID of the plugin   | String | required |  |
 | <a id="kt_compiler_plugin-options"></a>options |  Dictionary of options to be passed to the plugin. Supports the following template values:<br><br>- `{generatedClasses}`: directory for generated class output - `{temp}`: temporary directory, discarded between invocations - `{generatedSources}`:  directory for generated source output - `{classpath}` : replaced with a list of jars separated by the filesystem appropriate separator.   | <a href="https://bazel.build/rules/lib/core/dict">Dictionary: String -> String</a> | optional |  `{}`  |
 | <a id="kt_compiler_plugin-stubs_phase"></a>stubs_phase |  Runs the compiler plugin in kapt stub generation.   | Boolean | optional |  `True`  |
-| <a id="kt_compiler_plugin-target_embedded_compiler"></a>target_embedded_compiler |  Plugin was compiled against the embeddable kotlin compiler. These plugins expect shaded kotlinc dependencies, and will fail when running against a non-embeddable compiler.   | Boolean | optional |  `False`  |
+| <a id="kt_compiler_plugin-target_embedded_compiler"></a>target_embedded_compiler |  Plugin was compiled against the embeddable kotlin compiler. The plugin classpath is reshaded when this dialect differs from the dialect of the compiler that the toolchain runs.   | Boolean | optional |  `False`  |
 
 
 <a id="kt_javac_options"></a>
@@ -521,6 +557,32 @@ This allows setting options and dependencies independently from the initial plug
 | <a id="kt_plugin_cfg-plugin"></a>plugin |  The plugin to associate with this configuration   | <a href="https://bazel.build/concepts/labels">Label</a> | required |  |
 
 
+<a id="BtapiRuntimeInfo"></a>
+
+## BtapiRuntimeInfo
+
+<pre>
+load("@rules_kotlin//kotlin:core.bzl", "BtapiRuntimeInfo")
+
+BtapiRuntimeInfo(<a href="#BtapiRuntimeInfo-build_tools_impl">build_tools_impl</a>, <a href="#BtapiRuntimeInfo-compiler">compiler</a>, <a href="#BtapiRuntimeInfo-jdeps_gen">jdeps_gen</a>, <a href="#BtapiRuntimeInfo-jvm_abi_gen">jvm_abi_gen</a>, <a href="#BtapiRuntimeInfo-kapt">kapt</a>, <a href="#BtapiRuntimeInfo-libraries">libraries</a>, <a href="#BtapiRuntimeInfo-skip_code_gen">skip_code_gen</a>)
+</pre>
+
+The complete Build Tools API compilation runtime: the classloader group and the internal
+compiler plugins. Every jar is the embeddable compiler dialect.
+
+**FIELDS**
+
+| Name  | Description |
+| :------------- | :------------- |
+| <a id="BtapiRuntimeInfo-build_tools_impl"></a>build_tools_impl |  list of File: the Build Tools implementation.    |
+| <a id="BtapiRuntimeInfo-compiler"></a>compiler |  list of File: the compiler, embeddable dialect.    |
+| <a id="BtapiRuntimeInfo-jdeps_gen"></a>jdeps_gen |  list of File: the jdeps-gen compiler plugin, embeddable dialect.    |
+| <a id="BtapiRuntimeInfo-jvm_abi_gen"></a>jvm_abi_gen |  list of File: the jvm-abi-gen compiler plugin, embeddable dialect.    |
+| <a id="BtapiRuntimeInfo-kapt"></a>kapt |  list of File: the kapt compiler plugin, embeddable dialect.    |
+| <a id="BtapiRuntimeInfo-libraries"></a>libraries |  list of File: the libraries the implementation and the compiler need.    |
+| <a id="BtapiRuntimeInfo-skip_code_gen"></a>skip_code_gen |  list of File: the skip-code-gen compiler plugin, embeddable dialect.    |
+
+
 <a id="define_kt_toolchain"></a>
 
 ## define_kt_toolchain
@@ -531,25 +593,32 @@ load("@rules_kotlin//kotlin:core.bzl", "define_kt_toolchain")
 define_kt_toolchain(<a href="#define_kt_toolchain-name">name</a>, <a href="#define_kt_toolchain-language_version">language_version</a>, <a href="#define_kt_toolchain-api_version">api_version</a>, <a href="#define_kt_toolchain-jvm_target">jvm_target</a>, <a href="#define_kt_toolchain-experimental_use_abi_jars">experimental_use_abi_jars</a>,
                     <a href="#define_kt_toolchain-experimental_treat_internal_as_private_in_abi_jars">experimental_treat_internal_as_private_in_abi_jars</a>,
                     <a href="#define_kt_toolchain-experimental_remove_private_classes_in_abi_jars">experimental_remove_private_classes_in_abi_jars</a>,
-                    <a href="#define_kt_toolchain-experimental_remove_debug_info_in_abi_jars">experimental_remove_debug_info_in_abi_jars</a>, <a href="#define_kt_toolchain-experimental_strict_kotlin_deps">experimental_strict_kotlin_deps</a>,
-                    <a href="#define_kt_toolchain-experimental_report_unused_deps">experimental_report_unused_deps</a>, <a href="#define_kt_toolchain-experimental_reduce_classpath_mode">experimental_reduce_classpath_mode</a>,
-                    <a href="#define_kt_toolchain-experimental_track_class_usage">experimental_track_class_usage</a>, <a href="#define_kt_toolchain-experimental_track_resource_usage">experimental_track_resource_usage</a>,
-                    <a href="#define_kt_toolchain-experimental_multiplex_workers">experimental_multiplex_workers</a>, <a href="#define_kt_toolchain-experimental_multiplex_sandboxing">experimental_multiplex_sandboxing</a>,
-                    <a href="#define_kt_toolchain-supports_path_mapping">supports_path_mapping</a>, <a href="#define_kt_toolchain-experimental_build_tools_api">experimental_build_tools_api</a>, <a href="#define_kt_toolchain-experimental_kaptish_enabled">experimental_kaptish_enabled</a>,
-                    <a href="#define_kt_toolchain-experimental_kover_enabled">experimental_kover_enabled</a>, <a href="#define_kt_toolchain-experimental_kover_agent">experimental_kover_agent</a>, <a href="#define_kt_toolchain-experimental_kover_exclude">experimental_kover_exclude</a>,
-                    <a href="#define_kt_toolchain-experimental_kover_exclude_annotation">experimental_kover_exclude_annotation</a>, <a href="#define_kt_toolchain-experimental_kover_exclude_inherited_from">experimental_kover_exclude_inherited_from</a>,
-                    <a href="#define_kt_toolchain-javac_options">javac_options</a>, <a href="#define_kt_toolchain-kotlinc_options">kotlinc_options</a>, <a href="#define_kt_toolchain-jvm_stdlibs">jvm_stdlibs</a>, <a href="#define_kt_toolchain-jvm_runtime">jvm_runtime</a>, <a href="#define_kt_toolchain-jacocorunner">jacocorunner</a>,
-                    <a href="#define_kt_toolchain-exec_compatible_with">exec_compatible_with</a>, <a href="#define_kt_toolchain-target_compatible_with">target_compatible_with</a>, <a href="#define_kt_toolchain-target_settings">target_settings</a>)
+                    <a href="#define_kt_toolchain-experimental_remove_debug_info_in_abi_jars">experimental_remove_debug_info_in_abi_jars</a>,
+                    <a href="#define_kt_toolchain-experimental_preserve_declaration_order">experimental_preserve_declaration_order</a>,
+                    <a href="#define_kt_toolchain-experimental_remove_data_class_copy_if_constructor_is_private">experimental_remove_data_class_copy_if_constructor_is_private</a>,
+                    <a href="#define_kt_toolchain-experimental_strict_kotlin_deps">experimental_strict_kotlin_deps</a>, <a href="#define_kt_toolchain-experimental_report_unused_deps">experimental_report_unused_deps</a>,
+                    <a href="#define_kt_toolchain-experimental_reduce_classpath_mode">experimental_reduce_classpath_mode</a>, <a href="#define_kt_toolchain-experimental_multiplex_workers">experimental_multiplex_workers</a>,
+                    <a href="#define_kt_toolchain-experimental_multiplex_sandboxing">experimental_multiplex_sandboxing</a>, <a href="#define_kt_toolchain-supports_path_mapping">supports_path_mapping</a>,
+                    <a href="#define_kt_toolchain-experimental_build_tools_api">experimental_build_tools_api</a>, <a href="#define_kt_toolchain-btapi_runtime">btapi_runtime</a>, <a href="#define_kt_toolchain-javac_options">javac_options</a>, <a href="#define_kt_toolchain-kotlinc_options">kotlinc_options</a>,
+                    <a href="#define_kt_toolchain-jvm_stdlibs">jvm_stdlibs</a>, <a href="#define_kt_toolchain-jvm_runtime">jvm_runtime</a>, <a href="#define_kt_toolchain-jacocorunner">jacocorunner</a>, <a href="#define_kt_toolchain-exec_compatible_with">exec_compatible_with</a>,
+                    <a href="#define_kt_toolchain-target_compatible_with">target_compatible_with</a>, <a href="#define_kt_toolchain-target_settings">target_settings</a>)
 </pre>
 
 Define the Kotlin toolchain.
+
+The legacy invocation runs the compiler of the bundled CLI distribution. When the Build Tools
+API compilation is enabled, through `experimental_build_tools_api`, through `btapi_runtime`,
+or through the build setting `//kotlin/settings:experimental_build_tools_api`, the toolchain
+runs a Build Tools API runtime: the Build Tools implementation, the embeddable compiler, the
+libraries they need, and the internal compiler plugins in the embeddable dialect.
+
 
 **PARAMETERS**
 
 
 | Name  | Description | Default Value |
 | :------------- | :------------- | :------------- |
-| <a id="define_kt_toolchain-name"></a>name |  <p align="center"> - </p>   |  none |
+| <a id="define_kt_toolchain-name"></a>name |  the toolchain name.   |  none |
 | <a id="define_kt_toolchain-language_version"></a>language_version |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-api_version"></a>api_version |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-jvm_target"></a>jvm_target |  <p align="center"> - </p>   |  `None` |
@@ -565,13 +634,8 @@ Define the Kotlin toolchain.
 | <a id="define_kt_toolchain-experimental_multiplex_workers"></a>experimental_multiplex_workers |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-experimental_multiplex_sandboxing"></a>experimental_multiplex_sandboxing |  <p align="center"> - </p>   |  `None` |
 | <a id="define_kt_toolchain-supports_path_mapping"></a>supports_path_mapping |  <p align="center"> - </p>   |  `None` |
-| <a id="define_kt_toolchain-experimental_build_tools_api"></a>experimental_build_tools_api |  <p align="center"> - </p>   |  `None` |
-| <a id="define_kt_toolchain-experimental_kaptish_enabled"></a>experimental_kaptish_enabled |  <p align="center"> - </p>   |  `None` |
-| <a id="define_kt_toolchain-experimental_kover_enabled"></a>experimental_kover_enabled |  <p align="center"> - </p>   |  `False` |
-| <a id="define_kt_toolchain-experimental_kover_agent"></a>experimental_kover_agent |  <p align="center"> - </p>   |  `None` |
-| <a id="define_kt_toolchain-experimental_kover_exclude"></a>experimental_kover_exclude |  <p align="center"> - </p>   |  `[]` |
-| <a id="define_kt_toolchain-experimental_kover_exclude_annotation"></a>experimental_kover_exclude_annotation |  <p align="center"> - </p>   |  `[]` |
-| <a id="define_kt_toolchain-experimental_kover_exclude_inherited_from"></a>experimental_kover_exclude_inherited_from |  <p align="center"> - </p>   |  `[]` |
+| <a id="define_kt_toolchain-experimental_build_tools_api"></a>experimental_build_tools_api |  `True` enables the Build Tools API compilation for the toolchain. Unset, it is `True` when `btapi_runtime` is set and `False` otherwise. `False` keeps the legacy invocation until the build setting turns the Build Tools API on; a `btapi_runtime` then applies to that build only.   |  `None` |
+| <a id="define_kt_toolchain-btapi_runtime"></a>btapi_runtime |  a `kt_btapi_runtime` that replaces the default Build Tools API runtime, `//kotlin/compiler:btapi_runtime`, the runtime of the current Kotlin release. The runtime of another release is `@<name>//:runtime` of a repository the module extension tag `btapi_impl_version` declares. A runtime built on either with `base` replaces single artifacts. A runtime is an explicit choice of the Build Tools API compilation, see `experimental_build_tools_api`.   |  `None` |
 | <a id="define_kt_toolchain-javac_options"></a>javac_options |  <p align="center"> - </p>   |  `Label("@rules_kotlin//kotlin/internal:default_javac_options")` |
 | <a id="define_kt_toolchain-kotlinc_options"></a>kotlinc_options |  <p align="center"> - </p>   |  `Label("@rules_kotlin//kotlin/internal:default_kotlinc_options")` |
 | <a id="define_kt_toolchain-jvm_stdlibs"></a>jvm_stdlibs |  <p align="center"> - </p>   |  `None` |
@@ -608,7 +672,7 @@ This macro registers the kotlin toolchain.
 load("@rules_kotlin//kotlin:repositories.doc.bzl", "kotlin_repositories")
 
 kotlin_repositories(<a href="#kotlin_repositories-is_bzlmod">is_bzlmod</a>, <a href="#kotlin_repositories-compiler_repository_name">compiler_repository_name</a>, <a href="#kotlin_repositories-ksp_repository_name">ksp_repository_name</a>, <a href="#kotlin_repositories-compiler_release">compiler_release</a>,
-                    <a href="#kotlin_repositories-ksp_compiler_release">ksp_compiler_release</a>)
+                    <a href="#kotlin_repositories-ksp_compiler_release">ksp_compiler_release</a>, <a href="#kotlin_repositories-btapi_impl_releases">btapi_impl_releases</a>)
 </pre>
 
 Call this in the WORKSPACE file to setup the Kotlin rules.
@@ -621,8 +685,9 @@ Call this in the WORKSPACE file to setup the Kotlin rules.
 | <a id="kotlin_repositories-is_bzlmod"></a>is_bzlmod |  <p align="center"> - </p>   |  `False` |
 | <a id="kotlin_repositories-compiler_repository_name"></a>compiler_repository_name |  for the kotlinc compiler repository.   |  `"com_github_jetbrains_kotlin"` |
 | <a id="kotlin_repositories-ksp_repository_name"></a>ksp_repository_name |  <p align="center"> - </p>   |  `"com_github_google_ksp"` |
-| <a id="kotlin_repositories-compiler_release"></a>compiler_release |  version provider from versions.bzl.   |  `struct(sha256 = "a8cfc1d62cd4d0de4d04f42575e40135bd620588c17d568a20eb9c7c259af14f", url_templates = ["https://github.com/JetBrains/kotlin/releases/download/v{version}/kotlin-compiler-{version}.zip"], version = "2.3.21")` |
-| <a id="kotlin_repositories-ksp_compiler_release"></a>ksp_compiler_release |  (internal) version provider from versions.bzl.   |  `struct(sha256 = "7f462f48a966051e733df463938c35d6da1c3c7191cc889fe5e3b04c7d91b5ab", url_templates = ["https://github.com/google/ksp/releases/download/{version}/artifacts.zip"], version = "2.3.9")` |
+| <a id="kotlin_repositories-compiler_release"></a>compiler_release |  version provider from versions.bzl.   |  `struct(sha256 = "473dd66c7a3ef4b182065b3da670466c1bf2773a9dbb0ed8b33a39fe9d4f876d", url_templates = ["https://github.com/JetBrains/kotlin/releases/download/v{version}/kotlin-compiler-{version}.zip"], version = "2.4.10")` |
+| <a id="kotlin_repositories-ksp_compiler_release"></a>ksp_compiler_release |  (internal) version provider from versions.bzl.   |  `struct(sha256 = "b0e7666caf7afb634350ca64af9a88c3bd3e04df393fd33dbf430daaf285c6b3", url_templates = ["https://github.com/google/ksp/releases/download/{version}/artifacts.zip"], version = "2.3.11")` |
+| <a id="kotlin_repositories-btapi_impl_releases"></a>btapi_impl_releases |  the Build Tools API implementation records, a dict of repository name to a record built with btapi_impl_version. The record of the current release is always created as @btapi_impl unless the dict replaces it.   |  `None` |
 
 
 <a id="versions.use_repository"></a>

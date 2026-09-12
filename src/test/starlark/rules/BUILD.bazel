@@ -1,10 +1,46 @@
-load("//kotlin:core.bzl", "define_kt_toolchain")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("//kotlin:core.bzl", "define_kt_toolchain", "kt_btapi_runtime")
 load(":associates_tests.bzl", "associates_tests")
-load(":build_tools_api_toggle_tests.bzl", "build_tools_api_toggle_tests")
+load(":btapi_runtime_args_tests.bzl", "btapi_runtime_args_tests")
+load(":btapi_runtime_tests.bzl", "btapi_runtime_tests")
 load(":experimental_prune_transitive_deps_tests.bzl", "experimental_prune_transitive_deps_tests")
+load(":jdeps_merge_inputs_tests.bzl", "jdeps_merge_inputs_tests")
+load(":plugin_dialect_tests.bzl", "plugin_dialect_tests")
 
-build_tools_api_toggle_tests(
-    name = "build_tools_api_toggle_tests",
+btapi_runtime_args_tests(
+    name = "btapi_runtime_args_tests",
+)
+
+btapi_runtime_tests(
+    name = "btapi_runtime_tests",
+)
+
+# Only registered through --extra_toolchains by btapi_runtime_args_tests: a runtime built on the
+# default that replaces the compiler alone.
+write_file(
+    name = "marked_compiler_embeddable",
+    out = "marked-compiler-embeddable.jar",
+    content = [""],
+)
+
+kt_btapi_runtime(
+    name = "override_runtime",
+    base = "//kotlin/compiler:btapi_runtime",
+    compiler = [":marked_compiler_embeddable"],
+)
+
+# The runtime alone enables the Build Tools API compilation.
+define_kt_toolchain(
+    name = "override_runtime_toolchain",
+    btapi_runtime = ":override_runtime",
+)
+
+# Only registered through --extra_toolchains by btapi_runtime_args_tests: the same runtime, with
+# the Build Tools API compilation left to the build setting.
+define_kt_toolchain(
+    name = "setting_controlled_runtime_toolchain",
+    btapi_runtime = ":override_runtime",
+    experimental_build_tools_api = False,
 )
 
 experimental_prune_transitive_deps_tests(
@@ -22,4 +58,28 @@ define_kt_toolchain(
     experimental_report_unused_deps = "error",
     experimental_strict_kotlin_deps = "error",
     experimental_use_abi_jars = True,
+)
+
+# Only used by associates_tests, which pulls it in with --extra_toolchains.
+define_kt_toolchain(
+    name = "treat_internal_as_private_toolchain",
+    experimental_remove_private_classes_in_abi_jars = True,
+    experimental_report_unused_deps = "error",
+    experimental_strict_kotlin_deps = "error",
+    experimental_treat_internal_as_private_in_abi_jars = True,
+    experimental_use_abi_jars = True,
+)
+
+jdeps_merge_inputs_tests(
+    name = "jdeps_merge_inputs_tests",
+)
+
+plugin_dialect_tests(
+    name = "plugin_dialect_tests",
+)
+
+# Only registered through --extra_toolchains by the tests that need unused dep reporting on.
+define_kt_toolchain(
+    name = "report_unused_deps_toolchain",
+    experimental_report_unused_deps = "warn",
 )

@@ -81,6 +81,12 @@ kt_rules_e2e_test(
     data = ["//src/test/data/jvm/kaptish"],
 )
 
+kt_rules_e2e_test(
+    name = "ReshadeRulesAssertionTest",
+    srcs = ["ReshadeRulesAssertionTest.kt"],
+    data = ["//src/test/data/jvm/reshade"],
+)
+
 test_suite(
     name = "assertion_tests",
     tests = [

@@ -14,6 +14,7 @@
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_java//java:defs.bzl", "JavaInfo", "java_common")
 load("@rules_java//java/common:java_plugin_info.bzl", "JavaPluginInfo")
+load("//kotlin/internal:btapi_runtime.bzl", "BtapiRuntimeInfo")
 load(
     "//kotlin/internal:defs.bzl",
     _KT_COMPILER_REPO = "KT_COMPILER_REPO",
@@ -67,6 +68,11 @@ def _kotlin_toolchain_impl(ctx):
         for jar in ctx.files.jvm_runtime
     ]
 
+    build_tools_api = ctx.attr.experimental_build_tools_api or ctx.attr._experimental_build_tools_api_setting[BuildSettingInfo].value
+    runtime = ctx.attr.btapi_runtime[BtapiRuntimeInfo] if ctx.attr.btapi_runtime else None
+    if build_tools_api and runtime == None:
+        fail("%s: the Build Tools API compilation is enabled, but the toolchain has no btapi_runtime" % ctx.label)
+
     toolchain = dict(
         language_version = ctx.attr.language_version,
         api_version = ctx.attr.api_version,
@@ -98,6 +104,8 @@ def _kotlin_toolchain_impl(ctx):
         experimental_track_class_usage = ctx.attr.experimental_track_class_usage,
         experimental_track_resource_usage = ctx.attr.experimental_track_resource_usage,
         experimental_build_tools_api = ctx.attr.experimental_build_tools_api or ctx.attr._experimental_build_tools_api_setting[BuildSettingInfo].value,
+        experimental_build_tools_api = build_tools_api,
+        btapi_runtime = runtime,
         javac_options = ctx.attr.javac_options[JavacOptions] if ctx.attr.javac_options else None,
         kotlinc_options = ctx.attr.kotlinc_options[KotlincOptions] if ctx.attr.kotlinc_options else None,
         empty_jar = ctx.file._empty_jar,
@@ -139,6 +147,15 @@ _kt_toolchain = rule(
                 "2.2",
                 "2.3",
             ],
+        ),
+        "btapi_runtime": attr.label(
+            doc = """The Build Tools API compilation runtime (a kt_btapi_runtime): the classloader
+            group and the internal compiler plugins, all in the embeddable compiler dialect. The
+            legacy invocation does not read it. Required when the Build Tools API compilation is
+            enabled; define_kt_toolchain supplies the default runtime of the configured Kotlin
+            release.""",
+            providers = [BtapiRuntimeInfo],
+            cfg = "exec",
         ),
         "debug": attr.string_list(
             doc = """Debugging tags passed to the builder. Two tags are supported. `timings` will cause the builder to
@@ -401,6 +418,10 @@ _DEBUG_SELECT = select({
 # Evaluating the labels in the context of bzl file to get its repository
 _EXPERIMENTAL_USE_ABI_JARS = str(Label("//kotlin/internal:experimental_use_abi_jars"))
 _NOEXPERIMENTAL_USE_ABI_JARS = str(Label("//kotlin/internal:noexperimental_use_abi_jars"))
+_EXPERIMENTAL_BUILD_TOOLS_API_ENABLED = str(Label("//kotlin/settings:experimental_build_tools_api_enabled"))
+
+# The Build Tools API compilation runtime of the configured Kotlin release.
+_KT_DEFAULT_BTAPI_RUNTIME = Label("//kotlin/compiler:btapi_runtime")
 
 def define_kt_toolchain(
         name,
@@ -426,6 +447,7 @@ def define_kt_toolchain(
         experimental_kover_exclude = [],
         experimental_kover_exclude_annotation = [],
         experimental_kover_exclude_inherited_from = [],
+        btapi_runtime = None,
         javac_options = Label("//kotlin/internal:default_javac_options"),
         kotlinc_options = Label("//kotlin/internal:default_kotlinc_options"),
         jvm_stdlibs = None,
@@ -434,8 +456,40 @@ def define_kt_toolchain(
         exec_compatible_with = None,
         target_compatible_with = None,
         target_settings = None):
-    """Define the Kotlin toolchain."""
+    """Define the Kotlin toolchain.
+
+    The legacy invocation runs the compiler of the bundled CLI distribution. When the Build Tools
+    API compilation is enabled, through `experimental_build_tools_api`, through `btapi_runtime`,
+    or through the build setting `//kotlin/settings:experimental_build_tools_api`, the toolchain
+    runs a Build Tools API runtime: the Build Tools implementation, the embeddable compiler, the
+    libraries they need, and the internal compiler plugins in the embeddable dialect.
+
+    Args:
+        name: the toolchain name.
+        experimental_build_tools_api: `True` enables the Build Tools API compilation for the
+            toolchain. Unset, it is `True` when `btapi_runtime` is set and `False` otherwise.
+            `False` keeps the legacy invocation until the build setting turns the Build Tools
+            API on; a `btapi_runtime` then applies to that build only.
+        btapi_runtime: a `kt_btapi_runtime` that replaces the default Build Tools API runtime,
+            `//kotlin/compiler:btapi_runtime`, the runtime of the current Kotlin release. The
+            runtime of another release is `@<name>//:runtime` of a repository the module
+            extension tag `btapi_impl_version` declares. A runtime built on either with `base`
+            replaces single artifacts. A runtime is an explicit choice of the Build Tools API
+            compilation, see `experimental_build_tools_api`.
+        **kwargs: see the attributes of the toolchain rule.
+    """
     impl_name = name + "_impl"
+
+    if btapi_runtime == None:
+        btapi_runtime = _KT_DEFAULT_BTAPI_RUNTIME
+    elif experimental_build_tools_api == None:
+        experimental_build_tools_api = True
+    if experimental_build_tools_api != True:
+        # The runtime is fetched only when the build setting turns the Build Tools API on.
+        btapi_runtime = select({
+            _EXPERIMENTAL_BUILD_TOOLS_API_ENABLED: btapi_runtime,
+            "//conditions:default": None,
+        })
 
     _kt_toolchain(
         name = impl_name,
@@ -466,6 +520,7 @@ def define_kt_toolchain(
         experimental_kover_exclude = experimental_kover_exclude,
         experimental_kover_exclude_annotation = experimental_kover_exclude_annotation,
         experimental_kover_exclude_inherited_from = experimental_kover_exclude_inherited_from,
+        btapi_runtime = btapi_runtime,
         javac_options = javac_options,
         kotlinc_options = kotlinc_options,
         visibility = ["//visibility:public"],

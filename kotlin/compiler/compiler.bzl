@@ -63,3 +63,20 @@ def kt_configure_compiler():
 
     _import_artifacts(KOTLINC_ARTIFACTS.jvm, kt_jvm_import)
     _import_artifacts(KOTLINC_ARTIFACTS.core, kt_jvm_import)
+
+    # The Build Tools API interfaces are distributed as a separate jar from Kotlin 2.4.0 onwards.
+    kt_jvm_import(
+        name = "build-tools-api",
+        jars = ["@kotlin_build_tools_api//file"],
+        neverlink = 1,
+        visibility = ["//visibility:public"],
+    )
+
+    # The Build Tools API compilation runtime of the current Kotlin release: the toolchain uses it
+    # when the Build Tools API compilation is enabled. The repository @btapi_impl is built from the
+    # implementation record BTAPI_IMPL_CURRENT_RELEASE in versions.bzl.
+    native.alias(
+        name = "btapi_runtime",
+        actual = "@btapi_impl//:runtime",
+        visibility = ["//visibility:public"],
+    )

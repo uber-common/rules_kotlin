@@ -21,6 +21,7 @@ load(
     "java_common",
 )
 load("@rules_java//java/common:java_plugin_info.bzl", "JavaPluginInfo")
+load("//kotlin/internal:btapi_runtime.bzl", "btapi_runtime_classpath")
 load(
     "//kotlin/internal:defs.bzl",
     _JAVA_RUNTIME_TOOLCHAIN_TYPE = "JAVA_RUNTIME_TOOLCHAIN_TYPE",
@@ -554,6 +555,23 @@ def _run_ksp_builder_actions(
         ksp_generated_src_jar = ksp_generated_java_srcjar,
     )
 
+def btapi_runtime_worker_args(runtime):
+    """The worker flags that carry a runtime to a Build Tools API compilation.
+
+    Args:
+        runtime: a BtapiRuntimeInfo.
+    Returns:
+        list of (flag, list of File) pairs: the classloader group and the internal compiler plugins,
+        in the order the worker documents them.
+    """
+    return [
+        ("--btapi_impl_classpath", btapi_runtime_classpath(runtime)),
+        ("--internal_jvm_abi_gen_classpath", runtime.jvm_abi_gen),
+        ("--internal_skip_code_gen_classpath", runtime.skip_code_gen),
+        ("--internal_kapt_classpath", runtime.kapt),
+        ("--internal_jdeps_gen_classpath", runtime.jdeps_gen),
+    ]
+
 # payload: the single args.add_all item, a struct(plugins = ...) carrying the list of compiler plugins
 def _plugins_payload_to_json(payload):
     return _plugin_payload.plugins_payload_json(payload.plugins)
@@ -593,7 +611,28 @@ def _run_kt_builder_action(
     args.add("--reduced_classpath_mode", toolchains.kt.experimental_reduce_classpath_mode)
     args.add("--track_class_usage", toolchains.kt.experimental_track_class_usage)
     args.add("--track_resource_usage", toolchains.kt.experimental_track_resource_usage)
-    args.add("--build_tools_api", toolchains.kt.experimental_build_tools_api)
+
+    # These jvm-abi-gen plugin options all default to false, so only pass them when enabled to
+    # avoid emitting args that don't change the underlying behavior. See the option defaults in:
+    # https://github.com/JetBrains/kotlin/blob/v2.4.0/plugins/jvm-abi-gen/src/org/jetbrains/kotlin/jvm/abi/JvmAbiCommandLineProcessor.kt
+    if experimental_treat_internal_as_private_in_abi_jars:
+        args.add("--treat_internal_as_private_in_abi_jar", "true")
+    if experimental_remove_private_classes_in_abi_jars:
+        args.add("--remove_private_classes_in_abi_jar", "true")
+    if experimental_preserve_declaration_order:
+        args.add("--preserve_declaration_order", "true")
+    if experimental_remove_data_class_copy_if_constructor_is_private:
+        args.add("--remove_data_class_copy_if_constructor_is_private", "true")
+
+    # Pass Build Tools API compilation runtime flags: the worker builds an isolated compiler classloader
+    # from these toolchain-supplied jars (cached per distinct jar set), plus the internal compiler
+    # plugins matching that runtime's dialect. Relevant to Build Tools API actions only, legacy invocation's action inputs are unchanged.
+    btapi_runtime_inputs = []
+    if toolchains.kt.experimental_build_tools_api:
+        for flag, runtime_files in btapi_runtime_worker_args(toolchains.kt.btapi_runtime):
+            args.add_all(flag, runtime_files)
+            btapi_runtime_inputs.extend(runtime_files)
+
     args.add_all("--sources", srcs.all_srcs, omit_if_empty = True)
     args.add_all("--source_jars", srcs.src_jars + generated_src_jars, omit_if_empty = True)
     args.add_all("--deps_artifacts", deps_artifacts, omit_if_empty = True)
@@ -657,7 +696,7 @@ def _run_kt_builder_action(
     ctx.actions.run(
         mnemonic = mnemonic,
         inputs = depset(
-            srcs.all_srcs + srcs.src_jars + generated_src_jars,
+            srcs.all_srcs + srcs.src_jars + generated_src_jars + btapi_runtime_inputs,
             transitive = [
                 compile_deps.associate_jars,
                 compile_deps.compile_jars,
