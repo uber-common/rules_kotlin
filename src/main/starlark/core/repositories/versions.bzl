@@ -19,6 +19,11 @@ def _use_repository(rule, name, version, **kwargs):
 
     maybe(rule, name = name, **rule_arguments)
 
+# The Kotlin compiler release train: the CLI distribution, the Build Tools API jar, and the Build
+# Tools API implementation ship together under this one version. Bump them together; each
+# entry keeps its own per-artifact sha256.
+_KOTLIN_CURRENT_RELEASE = "2.4.20"
+
 versions = struct(
     # IMPORTANT! rules_kotlin does not use the bazel_skylib unittest in production
     # This means the bazel_skylib_workspace call is skipped, as it only registers the unittest
@@ -66,34 +71,34 @@ versions = struct(
         sha256 = "a3fd620207d5c40da6ca789b95e7f823c54e854b7fade7f613e91096a3706d75",
     ),
     KOTLIN_CURRENT_COMPILER_RELEASE = version(
-        version = "2.4.10",
+        version = _KOTLIN_CURRENT_RELEASE,
         url_templates = [
             "https://github.com/JetBrains/kotlin/releases/download/v{version}/kotlin-compiler-{version}.zip",
         ],
-        sha256 = "473dd66c7a3ef4b182065b3da670466c1bf2773a9dbb0ed8b33a39fe9d4f876d",
+        sha256 = "59e9ca74c7904ef2c122b12114937673ccce68de820a663f0ed66ccf8799e0b7",
     ),
     KSP_CURRENT_COMPILER_PLUGIN_RELEASE = version(
-        version = "2.3.11",
+        version = "2.3.12",
         url_templates = [
             "https://github.com/google/ksp/releases/download/{version}/artifacts.zip",
         ],
-        sha256 = "b0e7666caf7afb634350ca64af9a88c3bd3e04df393fd33dbf430daaf285c6b3",
+        sha256 = "31e83f087c3e822d16d93b2fd240769872ba1fad26e7f3b5dfb3f71513e7399f",
     ),
     KOTLIN_BUILD_TOOLS_IMPL = version(
-        version = "2.4.10",
+        version = _KOTLIN_CURRENT_RELEASE,
         url_templates = [
             "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-build-tools-impl/{version}/kotlin-build-tools-impl-{version}.jar",
         ],
-        sha256 = "4a32f63522ef4726afbdee1783f05698499abc7a5ecade3a6cafa3e4074562ee",
+        sha256 = "68fb6f266a66463a1ba3ddb99b96e5eb202ab19a5ca4e3b56dad5eec62641c7d",
     ),
     # Starting with Kotlin 2.4.0 the Build Tools API interfaces are no longer bundled in
     # kotlin-compiler.jar, so they must be provided as a separate jar.
     KOTLIN_BUILD_TOOLS_API = version(
-        version = "2.4.10",
+        version = _KOTLIN_CURRENT_RELEASE,
         url_templates = [
             "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-build-tools-api/{version}/kotlin-build-tools-api-{version}.jar",
         ],
-        sha256 = "3953d283e7710c990672e403a87df393d9726a9bf3e172194ebb5c33e062fcb0",
+        sha256 = "47a622dce7231b1916334b69a00bc1094adf6577e6492f9f06b3d9c2450fe459",
     ),
     RULES_ANDROID = version(
         version = "0.7.0",
