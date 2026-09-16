@@ -20,7 +20,8 @@ import io.bazel.kotlin.builder.utils.BazelRunFiles
 import io.bazel.kotlin.builder.utils.verified
 import java.io.File
 import java.io.PrintStream
-import java.lang.reflect.Method
+import java.lang.invoke.MethodHandle
+import java.lang.invoke.MethodHandles
 import java.net.URLClassLoader
 
 class KotlinToolchain private constructor(
@@ -83,13 +84,6 @@ class KotlinToolchain private constructor(
         ).toPath()
     }
 
-    private val KOTLIN_DAEMON_CLIENT by lazy {
-      BazelRunFiles
-        .resolveVerifiedFromProperty(
-          "@com_github_jetbrains_kotlin...kotlin-daemon-client",
-        ).toPath()
-    }
-
     private val COMPILER_STDLIB by lazy {
       BazelRunFiles
         .resolveVerifiedFromProperty(
@@ -104,35 +98,12 @@ class KotlinToolchain private constructor(
         ).toPath()
     }
 
-    private val KOTLINX_SERIALIZATION_CORE_JVM by lazy {
-      BazelRunFiles
-        .resolveVerifiedFromProperty(
-          "@com_github_jetbrains_kotlinx...serialization-core-jvm",
-        ).toPath()
-    }
-
-    private val KOTLINX_SERIALIZATION_JSON by lazy {
-      BazelRunFiles
-        .resolveVerifiedFromProperty(
-          "@com_github_jetbrains_kotlinx...serialization-json",
-        ).toPath()
-    }
-
-    private val KOTLINX_SERIALIZATION_JSON_JVM by lazy {
-      BazelRunFiles
-        .resolveVerifiedFromProperty(
-          "@com_github_jetbrains_kotlinx...serialization-json-jvm",
-        ).toPath()
-    }
-
     private val BUILD_TOOLS_API by lazy {
       BazelRunFiles
         .resolveVerifiedFromProperty(
-          "@com_github_jetbrains_kotlin...build-tools-impl",
+          "@com_github_jetbrains_kotlin...build-tools-api",
         ).toPath()
     }
-
-    internal val NO_ARGS = arrayOf<Any>()
 
     @JvmStatic
     fun createToolchain(): KotlinToolchain =
@@ -140,18 +111,12 @@ class KotlinToolchain private constructor(
         KOTLINC.verified().absoluteFile,
         COMPILER_STDLIB.verified().absoluteFile,
         COMPILER_REFLECT.verified().absoluteFile,
-        KOTLIN_DAEMON_CLIENT.verified().absoluteFile,
-        BUILD_TOOLS_IMPL.verified().absoluteFile,
         BUILD_TOOLS_API.verified().absoluteFile,
         COMPILER.verified().absoluteFile,
-        BUILD_TOOLS_API.verified().absoluteFile,
         JVM_ABI_PLUGIN.verified().absoluteFile,
         SKIP_CODE_GEN_PLUGIN.verified().absoluteFile,
         JDEPS_GEN_PLUGIN.verified().absoluteFile,
         KAPT_PLUGIN.verified().absoluteFile,
-        KOTLINX_SERIALIZATION_CORE_JVM.toFile(),
-        KOTLINX_SERIALIZATION_JSON.toFile(),
-        KOTLINX_SERIALIZATION_JSON_JVM.toFile(),
       )
 
     @JvmStatic
@@ -159,28 +124,20 @@ class KotlinToolchain private constructor(
       kotlinc: File,
       compilerStdlib: File,
       compilerReflect: File,
-      kotlinDaemonClient: File,
-      buildTools: File,
+      buildToolsApi: File,
       compiler: File,
       jvmAbiGenFile: File,
       skipCodeGenFile: File,
       jdepsGenFile: File,
       kaptFile: File,
-      kotlinxSerializationCoreJvm: File,
-      kotlinxSerializationJson: File,
-      kotlinxSerializationJsonJvm: File,
     ): KotlinToolchain =
       KotlinToolchain(
+        // The legacy compiler classloader: the rules_kotlin compiler wrapper and the CLI compiler
+        // distribution, whose manifest Class-Path resolves the standard library and friends from
+        // the distribution's lib directory.
         listOf(
           kotlinc,
           compiler,
-          buildTools,
-          jvmAbiGenFile,
-          skipCodeGenFile,
-          jdepsGenFile,
-          kotlinxSerializationCoreJvm,
-          kotlinxSerializationJson,
-          kotlinxSerializationJsonJvm,
         ),
         btapiJars =
           listOf(
@@ -240,18 +197,23 @@ class KotlinToolchain private constructor(
     clazz: String = "io.bazel.kotlin.compiler.BazelK2JVMCompiler",
   ) {
     private val compiler: Any
-    private val execMethod: Method
-    private val getCodeMethod: Method
+    private val execHandle: MethodHandle
+    private val getCodeHandle: MethodHandle
 
     init {
       val compilerClass = toolchain.classLoader.loadClass(clazz)
+      val compilerInterface =
+        toolchain.classLoader.loadClass("io.bazel.kotlin.compiler.KotlinCompiler")
       val exitCodeClass =
         toolchain.classLoader.loadClass("org.jetbrains.kotlin.cli.common.ExitCode")
 
-      compiler = compilerClass.getConstructor().newInstance()
-      execMethod =
-        compilerClass.getMethod("exec", PrintStream::class.java, Array<String>::class.java)
-      getCodeMethod = exitCodeClass.getMethod("getCode")
+      compiler = compilerInterface.cast(compilerClass.getConstructor().newInstance())
+
+      // The interface is the source of truth for the exec method signature.
+      val execMethod = compilerInterface.declaredMethods.single { it.name == "exec" }
+      val lookup = MethodHandles.lookup()
+      execHandle = lookup.unreflect(execMethod)
+      getCodeHandle = lookup.unreflect(exitCodeClass.getMethod("getCode"))
     }
 
     // Kotlin error codes:
@@ -260,10 +222,12 @@ class KotlinToolchain private constructor(
     // 3 is the script execution error
     fun compile(
       args: Array<String>,
+      sources: Array<String>,
+      destination: String,
       out: PrintStream,
     ): Int {
-      val exitCodeInstance = execMethod.invoke(compiler, out, args)
-      return getCodeMethod.invoke(exitCodeInstance, *NO_ARGS) as Int
+      val exitCode = execHandle.invoke(compiler, out, args, sources, destination)
+      return getCodeHandle.invoke(exitCode) as Int
     }
   }
 }
