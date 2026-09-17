@@ -71,19 +71,21 @@ versions = struct(
         ],
         sha256 = "5ba1ac917a06b0f02daaa60d10abbedd2220d60216af670c67a45b91c74cf8bb",
     ),
+    # Keep the fork's legacy compiler and KSP versions aligned with Android's Compose compiler.
+    # The independently supplied BTAPI runtime below can use the newer release train.
     KOTLIN_CURRENT_COMPILER_RELEASE = version(
-        version = _KOTLIN_CURRENT_RELEASE,
+        version = "2.3.21",
         url_templates = [
             "https://github.com/JetBrains/kotlin/releases/download/v{version}/kotlin-compiler-{version}.zip",
         ],
-        sha256 = "473dd66c7a3ef4b182065b3da670466c1bf2773a9dbb0ed8b33a39fe9d4f876d",
+        sha256 = "a8cfc1d62cd4d0de4d04f42575e40135bd620588c17d568a20eb9c7c259af14f",
     ),
     KSP_CURRENT_COMPILER_PLUGIN_RELEASE = version(
-        version = "2.3.11",
+        version = "2.3.9",
         url_templates = [
             "https://github.com/google/ksp/releases/download/{version}/artifacts.zip",
         ],
-        sha256 = "b0e7666caf7afb634350ca64af9a88c3bd3e04df393fd33dbf430daaf285c6b3",
+        sha256 = "7f462f48a966051e733df463938c35d6da1c3c7191cc889fe5e3b04c7d91b5ab",
     ),
     # Starting with Kotlin 2.4.0 the Build Tools API interfaces are no longer bundled in
     # kotlin-compiler.jar, so they must be provided as a separate jar.
