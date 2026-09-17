@@ -612,18 +612,6 @@ def _run_kt_builder_action(
     args.add("--track_class_usage", toolchains.kt.experimental_track_class_usage)
     args.add("--track_resource_usage", toolchains.kt.experimental_track_resource_usage)
 
-    # These jvm-abi-gen plugin options all default to false, so only pass them when enabled to
-    # avoid emitting args that don't change the underlying behavior. See the option defaults in:
-    # https://github.com/JetBrains/kotlin/blob/v2.4.0/plugins/jvm-abi-gen/src/org/jetbrains/kotlin/jvm/abi/JvmAbiCommandLineProcessor.kt
-    if experimental_treat_internal_as_private_in_abi_jars:
-        args.add("--treat_internal_as_private_in_abi_jar", "true")
-    if experimental_remove_private_classes_in_abi_jars:
-        args.add("--remove_private_classes_in_abi_jar", "true")
-    if experimental_preserve_declaration_order:
-        args.add("--preserve_declaration_order", "true")
-    if experimental_remove_data_class_copy_if_constructor_is_private:
-        args.add("--remove_data_class_copy_if_constructor_is_private", "true")
-
     # Pass Build Tools API compilation runtime flags: the worker builds an isolated compiler classloader
     # from these toolchain-supplied jars (cached per distinct jar set), plus the internal compiler
     # plugins matching that runtime's dialect. Relevant to Build Tools API actions only, legacy invocation's action inputs are unchanged.

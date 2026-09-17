@@ -244,12 +244,6 @@ class BtapiTaskExecutor(
       if (info.removeDebugInfo) {
         abiOptions.add("removeDebugInfo=true")
       }
-      if (info.preserveDeclarationOrder) {
-        abiOptions.add("preserveDeclarationOrder=true")
-      }
-      if (info.removeDataClassCopyIfConstructorIsPrivate) {
-        abiOptions.add("removeDataClassCopyIfConstructorIsPrivate=true")
-      }
       descriptors.add(
         PluginDescriptor(
           id = JVM_ABI_GEN_PLUGIN_ID,

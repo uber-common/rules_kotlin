@@ -173,15 +173,6 @@ class KotlinBuilder(
       argMap.optionalSingle(KotlinBuilderFlags.ABI_JAR_REMOVE_DEBUG_INFO)?.let {
         removeDebugInfo = it == "true"
       }
-      argMap.optionalSingle(KotlinBuilderFlags.ABI_JAR_PRESERVE_DECLARATION_ORDER)?.let {
-        preserveDeclarationOrder = it == "true"
-      }
-      argMap
-        .optionalSingle(
-          KotlinBuilderFlags.ABI_JAR_REMOVE_DATA_CLASS_COPY_IF_CONSTRUCTOR_IS_PRIVATE,
-        )?.let {
-          removeDataClassCopyIfConstructorIsPrivate = it == "true"
-        }
       this
     }
 

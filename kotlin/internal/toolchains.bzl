@@ -103,7 +103,6 @@ def _kotlin_toolchain_impl(ctx):
         experimental_reduce_classpath_mode = ctx.attr.experimental_reduce_classpath_mode,
         experimental_track_class_usage = ctx.attr.experimental_track_class_usage,
         experimental_track_resource_usage = ctx.attr.experimental_track_resource_usage,
-        experimental_build_tools_api = ctx.attr.experimental_build_tools_api or ctx.attr._experimental_build_tools_api_setting[BuildSettingInfo].value,
         experimental_build_tools_api = build_tools_api,
         btapi_runtime = runtime,
         javac_options = ctx.attr.javac_options[JavacOptions] if ctx.attr.javac_options else None,
@@ -238,6 +237,20 @@ _kt_toolchain = rule(
                 "warn",
                 "error",
             ],
+        ),
+        "experimental_track_class_usage": attr.string(
+            doc = """Enable per-class compilation avoidance. Records which specific classes
+            from each dependency are used during compilation, along with SHA-256 hashes
+            of their bytecode. Build systems can use this data to skip recompilation when
+            a dependency changes but the used classes remain unchanged.""",
+            default = "off",
+            values = ["off", "on"],
+        ),
+        "experimental_track_resource_usage": attr.string(
+            doc = """Enable Android R class resource tracking. Records which R class fields
+            are referenced during compilation.""",
+            default = "off",
+            values = ["off", "on"],
         ),
         "experimental_treat_internal_as_private_in_abi_jars": attr.bool(
             doc = """This applies the following compiler plugin option:
@@ -435,8 +448,8 @@ def define_kt_toolchain(
         experimental_strict_kotlin_deps = None,
         experimental_report_unused_deps = None,
         experimental_reduce_classpath_mode = None,
-        experimental_track_class_usage = False,
-        experimental_track_resource_usage = False,
+        experimental_track_class_usage = None,
+        experimental_track_resource_usage = None,
         experimental_multiplex_workers = None,
         experimental_multiplex_sandboxing = None,
         supports_path_mapping = None,
