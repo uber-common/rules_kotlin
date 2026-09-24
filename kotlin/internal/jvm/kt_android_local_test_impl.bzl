@@ -155,6 +155,9 @@ def _process_jvm(ctx, resources_ctx, **_unused_sub_ctxs):
 
             transitive.extend([depset(kover_agent_files), depset([kover_args_file]), depset([kover_output_metadata_file])])
 
+            # Bazel's offline JaCoCo instrumentation may still inject probes; keep the runtime on the classpath.
+            deps.append(ctx.toolchains[_TOOLCHAIN_TYPE].jacocorunner)
+
             java_start_class = ctx.attr.main_class
             coverage_start_class = None
         else:
