@@ -287,6 +287,48 @@ class KotlinBuilderJvmClassTrackingTest(private val enableK2Compiler: Boolean) {
       .contains("com.uber.R${'$'}string")
   }
 
+  @Test
+  fun `resource tracking records final constants in annotations defaults and initializers`() {
+    val cases = mapOf(
+      "annotation" to """
+        annotation class ResourceId(val value: Int)
+        @ResourceId(com.uber.R.string.constant)
+        class UsesAnnotation
+      """,
+      "default_argument" to "fun readId(id: Int = com.uber.R.string.constant) = id",
+      "const_initializer" to "const val copiedId = com.uber.R.string.constant",
+    )
+    cases.forEach { (case, source) ->
+      val deps = runJdepsCompileTaskWithClassTracking { c ->
+        c.setLabel("//:resource_$case")
+        c.trackResourceUsage("on")
+        c.addSource("UsesResources.kt", "package something\n$source")
+        c.addDirectDependencies(TEST_FIXTURES_DEP)
+      }
+      assertThat(depsProto(deps).usedResourcesList).containsExactly("com.uber.R.string.constant")
+    }
+  }
+
+  @Test
+  fun `resource tracking records styleable arrays and final indexes`() {
+    val deps = runJdepsCompileTaskWithClassTracking { c ->
+      c.setLabel("//:resource_styleable")
+      c.trackResourceUsage("on")
+      c.addSource(
+        "UsesStyleable.kt",
+        """
+          package something
+          fun readStyleable() = com.uber.R.styleable.Widget[com.uber.R.styleable.Widget_title]
+        """,
+      )
+      c.addDirectDependencies(TEST_FIXTURES_DEP)
+    }
+    assertThat(depsProto(deps).usedResourcesList).containsExactly(
+      "com.uber.R.styleable.Widget",
+      "com.uber.R.styleable.Widget_title",
+    )
+  }
+
   private fun depsProto(jdeps: Dep) =
     Deps.Dependencies.parseFrom(BufferedInputStream(Files.newInputStream(Paths.get(jdeps.jdeps()!!))))
 
