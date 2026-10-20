@@ -11,6 +11,8 @@ import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.arguments
 import org.jetbrains.kotlin.fir.expressions.toResolvedCallableSymbol
 import org.jetbrains.kotlin.fir.references.toResolvedFunctionSymbol
+import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
+import org.jetbrains.kotlin.fir.symbols.impl.FirFieldSymbol
 import org.jetbrains.kotlin.fir.types.isExtensionFunctionType
 import org.jetbrains.kotlin.fir.types.isUnit
 import org.jetbrains.kotlin.fir.types.resolvedType
@@ -24,6 +26,23 @@ internal class QualifiedAccessChecker(
     val resolvedCallableSymbol = expression.toResolvedCallableSymbol()
     resolvedCallableSymbol?.containerSource?.binaryClass()?.let {
       classUsageRecorder.recordClass(it)
+    }
+
+    // Resolve the actual declaring field rather than source spelling, so aliases and static
+    // imports record the same resource. Final IDs must be recorded too: the cache tracker
+    // must compare their constant values when Kotlin inlines them.
+    if (resolvedCallableSymbol is FirFieldSymbol) {
+      val owner = resolvedCallableSymbol.callableId.classId
+      if (owner != null && owner.relativeClassName.asString().matches(Regex("R\\.[^.]+"))) {
+        classUsageRecorder.usedResources.add(
+          "${owner.asSingleFqName().asString()}.${resolvedCallableSymbol.name.asString()}",
+        )
+        // Inlined constants may not leave a field read in the output bytecode. Preserve
+        // explicit dependency/class provenance independently of the resource list.
+        context.session.symbolProvider.getClassLikeSymbolByClassId(owner)?.let {
+          classUsageRecorder.recordClass(it, context)
+        }
+      }
     }
 
     // track return type
