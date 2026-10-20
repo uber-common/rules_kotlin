@@ -329,6 +329,21 @@ class KotlinBuilderJvmClassTrackingTest(private val enableK2Compiler: Boolean) {
     )
   }
 
+  @Test
+  fun `final resource owner remains an explicit dependency with detail tracking off`() {
+    val deps = runJdepsCompileTask { c ->
+      c.setLabel("//:resource_no_details")
+      c.trackResourceUsage("off").trackClassUsage("off")
+      c.addSource("UsesFinal.kt", "package something\nfun readId() = com.uber.R.string.constant")
+      c.addDirectDependencies(TEST_FIXTURES_DEP)
+    }
+    val jdeps = depsProto(deps)
+    assertThat(jdeps.usedResourcesList).isEmpty()
+    assertThat(jdeps.dependencyList.flatMap { it.usedClassesList }).isEmpty()
+    assertThat(jdeps.dependencyList.find { it.path == TEST_FIXTURES_DEP.singleCompileJar() }?.kind)
+      .isEqualTo(Deps.Dependency.Kind.EXPLICIT)
+  }
+
   private fun depsProto(jdeps: Dep) =
     Deps.Dependencies.parseFrom(BufferedInputStream(Files.newInputStream(Paths.get(jdeps.jdeps()!!))))
 
