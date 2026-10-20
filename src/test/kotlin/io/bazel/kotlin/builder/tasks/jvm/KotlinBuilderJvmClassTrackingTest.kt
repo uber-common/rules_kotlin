@@ -236,6 +236,57 @@ class KotlinBuilderJvmClassTrackingTest(private val enableK2Compiler: Boolean) {
     assertThat(javaClassHash1).isEqualTo(javaClassHash2)
   }
 
+  @Test
+  fun `resource tracking records resolved final and non-final field references`() {
+    val deps = runJdepsCompileTaskWithClassTracking { c ->
+      c.setLabel("//:resources")
+      c.trackResourceUsage("on")
+      c.addSource(
+        "UsesResources.kt",
+        """
+          package something
+
+          import com.uber.R.string.mutable as aliasedId
+          import com.uber.R.string.constant
+
+          fun readIds() = intArrayOf(aliasedId, constant, com.uber.R.string.qualified)
+        """,
+      )
+      c.addDirectDependencies(TEST_FIXTURES_DEP)
+    }
+
+    val jdeps = depsProto(deps)
+    assertThat(jdeps.usedResourcesList).containsExactly(
+      "com.uber.R.string.mutable",
+      "com.uber.R.string.constant",
+      "com.uber.R.string.qualified",
+    )
+    // Keep class/dependency provenance even for an inlined final ID.
+    assertThat(jdeps.dependencyList.flatMap { it.usedClassesList }.map { it.fullyQualifiedName })
+      .contains("com.uber.R${'$'}string")
+  }
+
+  @Test
+  fun `resource tracking off preserves class fallback`() {
+    val deps = runJdepsCompileTaskWithClassTracking { c ->
+      c.setLabel("//:resources_off")
+      c.trackResourceUsage("off")
+      c.addSource(
+        "UsesResources.kt",
+        """
+          package something
+          fun readId() = com.uber.R.string.constant
+        """,
+      )
+      c.addDirectDependencies(TEST_FIXTURES_DEP)
+    }
+
+    val jdeps = depsProto(deps)
+    assertThat(jdeps.usedResourcesList).isEmpty()
+    assertThat(jdeps.dependencyList.flatMap { it.usedClassesList }.map { it.fullyQualifiedName })
+      .contains("com.uber.R${'$'}string")
+  }
+
   private fun depsProto(jdeps: Dep) =
     Deps.Dependencies.parseFrom(BufferedInputStream(Files.newInputStream(Paths.get(jdeps.jdeps()!!))))
 
