@@ -595,6 +595,7 @@ def kt_compiler_plugin_impl(ctx):
         _KtCompilerPluginInfo(
             id = plugin_id,
             classpath = classpath,
+            data = depset(ctx.files.data),
             options = options,
             stubs = ctx.attr.stubs_phase,
             compile = ctx.attr.compile_phase,
