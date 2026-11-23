@@ -9,6 +9,7 @@ KtCompilerPluginInfo = provider(
     fields = {
         "classpath": "The kotlin compiler plugin classpath.",
         "compile": "Run this plugin during koltinc compilation.",
+        "data": "Depset of files the plugin reads during compilation, such as files named in its options.",
         "id": "The id of the plugin.",
         "merge_cfgs": "A Callable[[KtCompilerPluginInfo, List[KtPluginConfiguration]]] that merge multiple plugin configurations.",
         "options": "List of plugin options, represented as KtCompilerPluginOption, to be passed to the compiler",
